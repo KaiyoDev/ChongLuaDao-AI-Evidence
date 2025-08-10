@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "ChongLuaDao AI Evidence",
+  "description": "Chụp màn hình theo yêu cầu, phân tích bằng Gemini, vẽ bằng chứng, upload, lưu lịch sử.",
+  "version": "1.0.0",
+  "action": { "default_popup": "popup.html" },
+  "options_page": "options.html",
+  "permissions": ["activeTab", "scripting", "tabs", "storage"],
+  "host_permissions": ["https://chongluadao.vn/*", "https://generativelanguage.googleapis.com/*"],
+  "background": { "service_worker": "background.js" },
+  "icons": { "128": "icons/icon128.png" }
+}

@@ -1,0 +1,376 @@
+/* ===== Reset & Base ===== */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #1f2937;
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  min-width: 380px;
+  min-height: 500px;
+}
+
+/* ===== Popup Styles ===== */
+body:not(.options-page) {
+  padding: 16px;
+  max-width: 380px;
+}
+
+/* ===== Options Page ===== */
+.options-page {
+  padding: 24px;
+  max-width: 800px;
+  margin: 0 auto;
+  min-height: 100vh;
+}
+
+/* ===== Header ===== */
+.header {
+  text-align: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+h2, h3 {
+  color: #111827;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+h2 {
+  font-size: 24px;
+}
+
+h3 {
+  font-size: 18px;
+  margin-top: 24px;
+}
+
+h4 {
+  font-size: 16px;
+  margin-bottom: 12px;
+  color: #374151;
+}
+
+.subtitle {
+  color: #6b7280;
+  font-size: 13px;
+  margin: 0;
+}
+
+.description {
+  background: #f3f4f6;
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  text-align: center;
+  border-left: 4px solid #3b82f6;
+}
+
+/* ===== Buttons ===== */
+.button-group {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+button, .config-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: none;
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex: 1;
+  justify-content: center;
+  min-height: 40px;
+}
+
+.primary-btn {
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  color: white;
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+}
+
+.primary-btn:hover {
+  background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(59, 130, 246, 0.4);
+}
+
+.secondary-btn {
+  background: #f8fafc;
+  color: #374151;
+  border: 1px solid #d1d5db;
+}
+
+.secondary-btn:hover {
+  background: #f1f5f9;
+  border-color: #9ca3af;
+}
+
+.danger-btn {
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+}
+
+.danger-btn:hover {
+  background: #fee2e2;
+  border-color: #f87171;
+}
+
+.config-link {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
+.config-link:hover {
+  background: #fef2c7;
+  border-color: #f59e0b;
+}
+
+.btn-icon {
+  font-size: 14px;
+}
+
+/* ===== Forms ===== */
+.config-section {
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  border: 1px solid #e5e7eb;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+label {
+  display: block;
+  font-weight: 500;
+  margin-bottom: 6px;
+  color: #374151;
+}
+
+input, textarea, select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  background: white;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+textarea {
+  resize: vertical;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.help-text {
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 4px;
+  display: block;
+}
+
+.help-text a {
+  color: #3b82f6;
+  text-decoration: none;
+}
+
+.help-text a:hover {
+  text-decoration: underline;
+}
+
+/* ===== Status Messages ===== */
+.status {
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  margin: 12px 0;
+  border-left: 4px solid;
+  font-weight: 500;
+}
+
+.status.info {
+  background: #eff6ff;
+  color: #1e40af;
+  border-color: #3b82f6;
+}
+
+.status.success {
+  background: #f0fdf4;
+  color: #166534;
+  border-color: #22c55e;
+}
+
+.status.error {
+  background: #fef2f2;
+  color: #dc2626;
+  border-color: #ef4444;
+}
+
+.status.warning {
+  background: #fffbeb;
+  color: #92400e;
+  border-color: #f59e0b;
+}
+
+.status.loading {
+  background: #f3f4f6;
+  color: #4b5563;
+  border-color: #9ca3af;
+}
+
+/* ===== Result Containers ===== */
+.result-container, .history-container {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.result-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.copy-btn {
+  padding: 6px 10px;
+  font-size: 12px;
+  background: #f3f4f6;
+  color: #374151;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.copy-btn:hover {
+  background: #e5e7eb;
+  border-color: #9ca3af;
+}
+
+pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: #f8fafc;
+  padding: 12px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 12px;
+  line-height: 1.4;
+  max-height: 400px;
+  overflow-y: auto;
+  color: #374151;
+}
+
+/* ===== Info Box ===== */
+.info-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.info-box p {
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.info-box ul {
+  margin-left: 20px;
+  margin-bottom: 12px;
+}
+
+.info-box li {
+  margin-bottom: 4px;
+  font-size: 13px;
+  color: #4b5563;
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 400px) {
+  .button-group {
+    flex-direction: column;
+  }
+  
+  button, .config-link {
+    flex: none;
+  }
+}
+
+/* ===== Scrollbar ===== */
+pre::-webkit-scrollbar {
+  width: 6px;
+}
+
+pre::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+pre::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+pre::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* ===== Animations ===== */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.result-container, .history-container {
+  animation: fadeIn 0.3s ease;
+}
+
+/* ===== Main Section ===== */
+.main-section {
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  border: 1px solid #e5e7eb;
+}

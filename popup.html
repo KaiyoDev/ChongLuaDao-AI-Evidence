@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>ChongLuaDao AI Evidence</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="header">
+    <h3>🛡️ ChongLuaDao AI Evidence</h3>
+    <p class="subtitle">Phát hiện lừa đảo bằng AI - Tạo bằng chứng tự động</p>
+  </div>
+  
+  <div class="main-section">
+    <p class="description">
+      🔍 Chụp màn hình → Gemini phân tích → Vẽ bằng chứng → Upload → Lưu lịch sử
+    </p>
+    
+    <div class="button-group">
+      <button id="run" class="primary-btn">
+        <span class="btn-icon">📸</span>
+        Chụp & Phân tích (Gemini)
+      </button>
+      <a class="config-link" href="options.html" target="_blank">
+        <span class="btn-icon">⚙️</span>
+        Cấu hình API
+      </a>
+    </div>
+    
+    <div class="button-group">
+      <button id="history" class="secondary-btn">
+        <span class="btn-icon">📋</span>
+        Xem lịch sử
+      </button>
+      <button id="clear" class="danger-btn">
+        <span class="btn-icon">🗑️</span>
+        Xoá lịch sử
+      </button>
+    </div>
+  </div>
+
+  <div id="status" class="status"></div>
+  
+  <div id="result" class="result-container" hidden>
+    <div class="result-header">
+      <h4>📊 Kết quả phân tích:</h4>
+      <button id="copyReport" class="copy-btn">
+        <span class="btn-icon">📋</span>
+        Copy báo cáo
+      </button>
+    </div>
+    <pre id="resultData"></pre>
+  </div>
+  
+  <div id="historyList" class="history-container" hidden>
+    <h4>📜 Lịch sử phân tích:</h4>
+    <pre id="historyData"></pre>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

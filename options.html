@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Cấu hình - ChongLuaDao AI Evidence</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="options-page">
+  <div class="header">
+    <h2>⚙️ Cấu hình Extension</h2>
+    <p class="subtitle">Thiết lập API Gemini và tùy chọn upload</p>
+  </div>
+
+  <div class="config-section">
+    <h3>🤖 Cấu hình Google Gemini API</h3>
+    <div class="form-group">
+      <label for="geminiApiKey">API Key *</label>
+      <input 
+        id="geminiApiKey" 
+        type="password" 
+        placeholder="AIza..." 
+        required
+      />
+      <small class="help-text">
+        Lấy API key tại: <a href="https://makersuite.google.com/app/apikey" target="_blank">Google AI Studio</a>
+      </small>
+    </div>
+
+    <div class="form-group">
+      <label for="geminiModel">Model AI</label>
+      <select id="geminiModel">
+        <option value="gemini-1.5-pro">gemini-1.5-pro (Khuyên dùng)</option>
+        <option value="gemini-2.0-flash">gemini-2.0-flash (Nhanh hơn)</option>
+        <option value="gemini-pro-vision">gemini-pro-vision</option>
+      </select>
+      <small class="help-text">Model gemini-1.5-pro cho kết quả tốt nhất</small>
+    </div>
+
+    <div class="form-group">
+      <label for="geminiEndpointBase">Endpoint Base (Tùy chọn)</label>
+      <input 
+        id="geminiEndpointBase" 
+        type="url"
+        placeholder="https://generativelanguage.googleapis.com" 
+      />
+      <small class="help-text">Để trống sẽ dùng endpoint mặc định của Google</small>
+    </div>
+  </div>
+
+  <div class="config-section">
+    <h3>📤 Cấu hình Upload Ảnh</h3>
+    <div class="form-group">
+      <label for="apiHeaders">Headers tùy chỉnh (JSON)</label>
+      <textarea 
+        id="apiHeaders" 
+        rows="6" 
+        placeholder='{
+  "Authorization": "Bearer your-token",
+  "X-Custom-Header": "value"
+}'
+      ></textarea>
+      <small class="help-text">
+        Thêm header xác thực nếu API upload yêu cầu. Để trống nếu không cần.
+      </small>
+    </div>
+  </div>
+
+  <div class="config-section">
+    <h3>ℹ️ Thông tin</h3>
+    <div class="info-box">
+      <p><strong>🎯 Chức năng:</strong></p>
+      <ul>
+        <li>Chụp màn hình trang web hiện tại</li>
+        <li>Phân tích bằng AI Gemini để phát hiện lừa đảo</li>
+        <li>Vẽ chú thích bằng chứng lên ảnh</li>
+        <li>Upload ảnh lên server ChongLuaDao.vn</li>
+        <li>Lưu lịch sử phân tích cục bộ</li>
+      </ul>
+      
+      <p><strong>🔒 Bảo mật:</strong></p>
+      <ul>
+        <li>API key chỉ lưu trên máy bạn</li>
+        <li>Không gửi dữ liệu cho bên thứ ba khác</li>
+        <li>Ảnh upload qua HTTPS an toàn</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="button-group">
+    <button id="save" class="primary-btn">
+      <span class="btn-icon">💾</span>
+      Lưu cấu hình
+    </button>
+    <button id="test" class="secondary-btn">
+      <span class="btn-icon">🧪</span>
+      Test API
+    </button>
+  </div>
+
+  <div id="status" class="status"></div>
+
+  <script src="options.js"></script>
+</body>
+</html>

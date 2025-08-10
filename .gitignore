@@ -1,0 +1,13 @@
+# Node
+node_modules
+npm-debug.log
+yarn.lock
+package-lock.json
+
+# Build
+*.zip
+dist/
+
+# OS
+.DS_Store
+Thumbs.db
