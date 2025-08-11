@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "ChongLuaDao AI Evidence",
-  "description": "Chụp màn hình theo yêu cầu, phân tích bằng Gemini, vẽ bằng chứng, upload, lưu lịch sử.",
-  "version": "2.6.0",
+  "description": "Phân tích chuyên sâu các trang lừa đảo, chợ đen (CCV, tiền bẩn), tạo bằng chứng chi tiết bằng AI.",
+  "version": "2.8.0",
   "action": { "default_popup": "popup.html" },
   "options_page": "options.html",
   "permissions": ["activeTab", "scripting", "tabs", "storage"],

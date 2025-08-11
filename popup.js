@@ -38,13 +38,22 @@ $("#runQuick").addEventListener("click", async () => {
 
 async function runAnalysis(mode = "FULL_PAGE") {
   try {
-    const statusText = mode === "QUICK" ? "⚡ Đang chụp viewport hiện tại..." : "📸 Đang chụp toàn bộ trang web...";
-    setStatus(statusText, "loading");
+    // Get current tab first to check URL
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    
+    // Kiểm tra đặc biệt cho các trang chợ đen
+    const url = tab.url.toLowerCase();
+    let specialWarning = "";
+    if (url.includes('tienban') || url.includes('chợ đen') || url.includes('ccv') || url.includes('dump')) {
+      specialWarning = "🚨 CẢNH BÁO: Đây có thể là trang chợ đen bán hoạt động bất hợp pháp! ";
+    }
+    
+    const statusText = mode === "QUICK" ? 
+      `${specialWarning}⚡ Đang chụp viewport và phân tích...` : 
+      `${specialWarning}📸 Đang chụp toàn bộ trang và phân tích chuyên sâu...`;
+    setStatus(statusText, specialWarning ? "error" : "loading");
     $("#result").hidden = true;
     $("#historyList").hidden = true;
-
-    // Get current tab
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     
     // Send message to background script
     const response = await chrome.runtime.sendMessage({ 
