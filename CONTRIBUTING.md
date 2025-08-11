@@ -228,7 +228,7 @@ ChongLuaDao-AI-Evidence/
 ### Getting Help
 - **GitHub Issues**: Báo cáo bugs, đề xuất features
 - **Discussions**: Thảo luận về dự án
-- **Email**: support@chongluadao.vn
+- **Email**: sadboydev06@gmail.com
 
 ### Code of Conduct
 - Tôn trọng mọi người
