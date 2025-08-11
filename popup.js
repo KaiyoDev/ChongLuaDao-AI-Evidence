@@ -181,6 +181,9 @@ async function runAnalysis(mode = "FULL_PAGE") {
     currentReportText = reportText; // Lưu để copy sau
     currentReportData = report; // Lưu để điền form
     
+    // Debug: Log để kiểm tra dữ liệu
+    console.log('Current report data set:', currentReportData);
+    
     // Format display data cho JSON view (backup)
     const riskInfo = formatRiskLevel(aiData.risk || 0);
     const displayData = {
@@ -256,7 +259,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $("#clear").addEventListener("click", async () => {
     if (confirm("Bạn có chắc muốn xóa tất cả lịch sử phân tích?")) {
       try {
-        await chrome.storage.local.remove(['analysisHistory']);
+        await chrome.storage.local.remove(['analysis_history']);
         showToast("🗑️ Đã xóa tất cả lịch sử", "success");
         $("#historyList").hidden = true;
       } catch (error) {
@@ -282,24 +285,36 @@ document.addEventListener('DOMContentLoaded', () => {
   // Fill form
   $("#fillForm").addEventListener("click", async () => {
     try {
+      console.log('Fill form clicked, currentReportData:', currentReportData);
+      
       if (currentReportData) {
-        // Open ChongLuaDao form
-        const formUrl = "https://chongluadao.vn/report/reportphishing";
-        await chrome.tabs.create({ url: formUrl });
-        showToast("📝 Đã mở form ChongLuaDao", "success");
+        // Gọi background script để điền form tự động
+        const response = await chrome.runtime.sendMessage({
+          type: "FILL_CHONGLUADAO_FORM",
+          reportData: currentReportData
+        });
+        
+        console.log('Background response:', response);
+        
+        if (response.ok) {
+          showToast("📝 Đã điền form ChongLuaDao tự động", "success");
+        } else {
+          showToast("⚠️ " + (response.error || "Không thể điền form tự động"), "warning");
+        }
       } else {
         showToast("❌ Không có dữ liệu để điền form", "error");
       }
     } catch (error) {
-      showToast("❌ Lỗi khi mở form", "error");
+      console.error('Fill form error:', error);
+      showToast("❌ Lỗi khi điền form", "error");
     }
   });
 
   // Export history
   $("#exportHistory").addEventListener("click", async () => {
     try {
-      const history = await chrome.storage.local.get(['analysisHistory']);
-      const historyData = history.analysisHistory || [];
+      const history = await chrome.storage.local.get(['analysis_history']);
+      const historyData = history.analysis_history || [];
       
       if (historyData.length === 0) {
         showToast("❌ Không có dữ liệu để xuất", "error");

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Extension</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(255,255,255,0.1);
+            padding: 30px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 5px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Test ChongLuaDao Extension</h1>
+        
+        <div class="test-section">
+            <h3>📊 Test Storage</h3>
+            <button onclick="testStorage()">Test Storage</button>
+            <button onclick="clearStorage()">Clear Storage</button>
+            <div id="storageResult" class="result"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>🔍 Test Analysis</h3>
+            <p>Mở extension và click "Phân tích toàn trang" để test</p>
+            <div id="analysisResult" class="result"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>📝 Test Form Fill</h3>
+            <p>Chạy phân tích trước, sau đó click "Điền Form" để test</p>
+            <div id="formResult" class="result"></div>
+        </div>
+    </div>
+
+    <script>
+        async function testStorage() {
+            try {
+                const result = await chrome.storage.local.get(['analysis_history']);
+                const history = result.analysis_history || [];
+                document.getElementById('storageResult').textContent = 
+                    `Storage test: ${history.length} items found\n${JSON.stringify(history.slice(0, 2), null, 2)}`;
+            } catch (error) {
+                document.getElementById('storageResult').textContent = `Error: ${error.message}`;
+            }
+        }
+        
+        async function clearStorage() {
+            try {
+                await chrome.storage.local.remove(['analysis_history']);
+                document.getElementById('storageResult').textContent = 'Storage cleared successfully';
+            } catch (error) {
+                document.getElementById('storageResult').textContent = `Error: ${error.message}`;
+            }
+        }
+        
+        // Listen for messages from extension
+        chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+            console.log('Received message:', message);
+            if (message.type === 'STATUS_UPDATE') {
+                document.getElementById('analysisResult').textContent = message.message;
+            }
+        });
+    </script>
+</body>
+</html>

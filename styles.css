@@ -1931,10 +1931,54 @@ pre::-webkit-scrollbar-thumb:hover {
   font-size: 14px;
   color: var(--gray-700);
   line-height: 1.5;
+  margin-bottom: var(--space-3);
 }
 
 [data-theme="dark"] .history-item-summary {
   color: var(--gray-300);
+}
+
+.history-item-findings {
+  margin: var(--space-3) 0;
+  padding: var(--space-3);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+}
+
+.history-item-findings ul {
+  margin: var(--space-2) 0 0 0;
+  padding-left: var(--space-4);
+}
+
+.history-item-findings li {
+  margin-bottom: var(--space-1);
+  font-size: 13px;
+  color: var(--gray-600);
+  line-height: 1.4;
+}
+
+[data-theme="dark"] .history-item-findings li {
+  color: var(--gray-400);
+}
+
+.history-item-evidence {
+  margin: var(--space-3) 0;
+  padding: var(--space-3);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+}
+
+.history-item-evidence p {
+  margin: var(--space-2) 0 0 0;
+  font-size: 13px;
+  color: var(--gray-600);
+  line-height: 1.5;
+}
+
+[data-theme="dark"] .history-item-evidence p {
+  color: var(--gray-400);
 }
 
 .history-item-meta {

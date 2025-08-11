@@ -96,8 +96,8 @@ let filteredData = [];
 async function loadHistoryData() {
   try {
     showLoading(true);
-    const result = await chrome.storage.local.get(['analysisHistory']);
-    historyData = result.analysisHistory || [];
+    const result = await chrome.storage.local.get(['analysis_history']);
+    historyData = result.analysis_history || [];
     filteredData = [...historyData];
     
     updateStats();
@@ -151,8 +151,10 @@ function renderHistoryList() {
   historyList.innerHTML = filteredData.map((item, index) => {
     const riskInfo = formatRiskLevel(item.ai?.risk || 0);
     const formattedDate = formatDate(item.time);
-    const summary = truncateText(item.ai?.summary || 'Không có tóm tắt', 80);
+    const summary = item.ai?.summary || 'Không có tóm tắt';
     const url = item.url || 'Không có URL';
+    const findings = item.ai?.findings || [];
+    const evidenceText = item.ai?.evidence_text || '';
     
     return `
       <div class="history-item" data-index="${index}">
@@ -161,7 +163,7 @@ function renderHistoryList() {
             <span class="risk-badge ${riskInfo.class}">
               ${riskInfo.icon} ${item.ai?.risk || 0}/10
             </span>
-            <span class="history-item-url">${truncateText(url, 50)}</span>
+            <span class="history-item-url">${url}</span>
           </div>
           <div class="history-item-actions">
             <button class="action-btn view-btn" title="Xem chi tiết">
@@ -176,7 +178,22 @@ function renderHistoryList() {
           </div>
         </div>
         <div class="history-item-content">
-          <p class="history-item-summary">${summary}</p>
+          <p class="history-item-summary"><strong>Tóm tắt:</strong> ${summary}</p>
+          ${findings.length > 0 ? `
+            <div class="history-item-findings">
+              <strong>Dấu hiệu phát hiện (${findings.length}):</strong>
+              <ul>
+                ${findings.slice(0, 5).map(finding => `<li>${finding}</li>`).join('')}
+                ${findings.length > 5 ? `<li><em>... và ${findings.length - 5} dấu hiệu khác</em></li>` : ''}
+              </ul>
+            </div>
+          ` : ''}
+          ${evidenceText ? `
+            <div class="history-item-evidence">
+              <strong>Bằng chứng:</strong>
+              <p>${evidenceText.length > 300 ? evidenceText.substring(0, 300) + '...' : evidenceText}</p>
+            </div>
+          ` : ''}
           <div class="history-item-meta">
             <span class="meta-item">
               <span class="meta-icon">📅</span>
@@ -185,6 +202,10 @@ function renderHistoryList() {
             <span class="meta-item">
               <span class="meta-icon">🔗</span>
               ${item.uploads?.annotated?.link ? 'Có ảnh' : 'Không có ảnh'}
+            </span>
+            <span class="meta-item">
+              <span class="meta-icon">📊</span>
+              ${findings.length} dấu hiệu
             </span>
           </div>
         </div>

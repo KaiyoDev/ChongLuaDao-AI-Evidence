@@ -1397,9 +1397,20 @@ async function annotateWithAI(dataUrl, report) {
 // Lưu lịch sử (tối đa 300 entries)
 async function pushHistory(entry) {
   const KEY = "analysis_history";
-  const { [KEY]: list = [] } = await chrome.storage.local.get([KEY]);
-  list.unshift(entry);
-  await chrome.storage.local.set({ [KEY]: list.slice(0, 300) });
+  console.log('Pushing history entry:', entry);
+  
+  try {
+    const { [KEY]: list = [] } = await chrome.storage.local.get([KEY]);
+    console.log('Current history list length:', list.length);
+    
+    list.unshift(entry);
+    await chrome.storage.local.set({ [KEY]: list.slice(0, 300) });
+    
+    console.log('History saved successfully, new length:', list.length);
+  } catch (error) {
+    console.error('Error saving history:', error);
+    throw error;
+  }
 }
 
 // ===== Gemini (Google Generative Language API) =====
@@ -1646,6 +1657,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   (async () => {
     try {
       if (msg?.type === "RUN_CAPTURE_AND_ANALYZE") {
+        console.log('Received RUN_CAPTURE_AND_ANALYZE message:', msg);
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
         const tabId = tab.id;
 
@@ -1745,7 +1757,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         };
 
         // 7) Lưu vào lịch sử
+        console.log('Saving report to history...');
         await pushHistory(report);
+        console.log('Report saved, sending response...');
         sendResponse({ ok: true, report });
       }
 
@@ -1760,14 +1774,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       }
 
       if (msg?.type === "FILL_CHONGLUADAO_FORM") {
+        console.log('Received FILL_CHONGLUADAO_FORM message:', msg);
         const reportData = msg.reportData;
         const aiData = reportData.ai || {};
+        
+        // Lấy email từ storage
+        const { userEmail } = await chrome.storage.sync.get(['userEmail']);
         
         // Tạo dữ liệu form
         const formData = {
           url: reportData.url || '',
           category: detectCategory(aiData),
           evidence: generateShortEvidence(aiData, reportData.url),
+          email: userEmail || '',
           images: {
             currentView: reportData.uploads?.currentView?.link || '',
             fullPage: reportData.uploads?.fullPage?.link || '',
@@ -1802,12 +1821,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         
         // Điền form
         try {
+          console.log('Executing form fill script with data:', formData);
+          
           await chrome.scripting.executeScript({
             target: { tabId: newTab.id },
             func: fillChongLuaDaoForm,
             args: [formData]
           });
           
+          console.log('Form fill script executed successfully');
           sendResponse({ ok: true, message: "Đã điền form thành công" });
         } catch (error) {
           console.error("Failed to fill form:", error);
@@ -1863,18 +1885,16 @@ function fillChongLuaDaoForm(formData) {
         console.log('Evidence field filled');
       }
       
-      // Điền email (nếu có trong storage)
-      chrome.storage.sync.get(['userEmail'], (result) => {
-        if (result.userEmail) {
-          const emailField = document.querySelector('input[type="email"], input[placeholder*="Email"], input[name*="email"]');
-          if (emailField) {
-            emailField.value = result.userEmail;
-            emailField.dispatchEvent(new Event('input', { bubbles: true }));
-            emailField.dispatchEvent(new Event('change', { bubbles: true }));
-            console.log('Email field filled');
-          }
+      // Điền email (nếu có trong formData)
+      if (formData.email) {
+        const emailField = document.querySelector('input[type="email"], input[placeholder*="Email"], input[name*="email"]');
+        if (emailField) {
+          emailField.value = formData.email;
+          emailField.dispatchEvent(new Event('input', { bubbles: true }));
+          emailField.dispatchEvent(new Event('change', { bubbles: true }));
+          console.log('Email field filled');
         }
-      });
+      }
       
       // Thêm thông tin về 2 ảnh chính vào phần bằng chứng
       if (formData.images && (formData.images.fullPage || formData.images.annotated)) {
