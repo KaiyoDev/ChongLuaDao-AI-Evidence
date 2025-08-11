@@ -1,14 +1,22 @@
 <!doctype html>
-<html lang="vi">
+<html lang="vi" data-theme="light">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Cấu hình - ChongLuaDao AI Evidence</title>
   <link rel="stylesheet" href="styles.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 </head>
 <body class="options-page">
-  <div class="header">
-    <h2>⚙️ Cấu hình Extension</h2>
+  <!-- Theme Toggle -->
+  <button class="theme-toggle" id="themeToggle" title="Chuyển đổi giao diện">
+    <span class="theme-icon">🌙</span>
+  </button>
+
+  <div class="header shimmer-effect">
+    <h2 class="gradient-text">⚙️ Cấu hình Extension</h2>
     <p class="subtitle">Thiết lập API Gemini và tùy chọn upload</p>
   </div>
 
@@ -103,17 +111,26 @@
   </div>
 
   <div class="button-group">
-    <button id="save" class="primary-btn">
+    <button id="save" class="primary-btn shimmer-effect">
       <span class="btn-icon">💾</span>
-      Lưu cấu hình
+      <div class="btn-content">
+        <div class="btn-title">Lưu cấu hình</div>
+        <div class="btn-subtitle">Lưu tất cả thiết lập</div>
+      </div>
     </button>
-    <button id="test" class="secondary-btn">
+    <button id="test" class="secondary-btn shimmer-effect">
       <span class="btn-icon">🧪</span>
-      Test API
+      <div class="btn-content">
+        <div class="btn-title">Test API</div>
+        <div class="btn-subtitle">Kiểm tra kết nối</div>
+      </div>
     </button>
   </div>
 
   <div id="status" class="status"></div>
+
+  <!-- Toast Container -->
+  <div id="toastContainer" class="toast-container"></div>
 
   <script src="options.js"></script>
 </body>

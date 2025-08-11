@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="vi" data-theme="light">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Lịch sử - ChongLuaDao AI Evidence</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body class="history-page">
+  <!-- Theme Toggle -->
+  <button class="theme-toggle" id="themeToggle" title="Chuyển đổi giao diện">
+    <span class="theme-icon">🌙</span>
+  </button>
+
+  <div class="header shimmer-effect">
+    <h2 class="gradient-text">📜 Lịch sử phân tích</h2>
+    <p class="subtitle">Xem lại tất cả các phân tích lừa đảo đã thực hiện</p>
+  </div>
+
+  <!-- Stats Section -->
+  <div class="stats-section">
+    <div class="stat-card hover-lift">
+      <div class="stat-icon">📊</div>
+      <div class="stat-content">
+        <div class="stat-number" id="totalAnalyses">0</div>
+        <div class="stat-label">Tổng phân tích</div>
+      </div>
+    </div>
+    <div class="stat-card hover-lift">
+      <div class="stat-icon">🚨</div>
+      <div class="stat-content">
+        <div class="stat-number" id="highRiskCount">0</div>
+        <div class="stat-label">Rủi ro cao</div>
+      </div>
+    </div>
+    <div class="stat-card hover-lift">
+      <div class="stat-icon">✅</div>
+      <div class="stat-content">
+        <div class="stat-number" id="safeCount">0</div>
+        <div class="stat-label">An toàn</div>
+      </div>
+    </div>
+    <div class="stat-card hover-lift">
+      <div class="stat-icon">📅</div>
+      <div class="stat-content">
+        <div class="stat-number" id="todayCount">0</div>
+        <div class="stat-label">Hôm nay</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filters Section -->
+  <div class="filters-section">
+    <div class="filter-group">
+      <label for="riskFilter">Lọc theo rủi ro:</label>
+      <select id="riskFilter">
+        <option value="all">Tất cả</option>
+        <option value="high">Rủi ro cao (8-10)</option>
+        <option value="medium">Rủi ro trung bình (5-7)</option>
+        <option value="low">Rủi ro thấp (0-4)</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label for="dateFilter">Lọc theo ngày:</label>
+      <select id="dateFilter">
+        <option value="all">Tất cả</option>
+        <option value="today">Hôm nay</option>
+        <option value="week">Tuần này</option>
+        <option value="month">Tháng này</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label for="searchInput">Tìm kiếm:</label>
+      <input type="text" id="searchInput" placeholder="Tìm theo URL hoặc nội dung...">
+    </div>
+  </div>
+
+  <!-- Actions Section -->
+  <div class="actions-section">
+    <button id="exportAll" class="primary-btn shimmer-effect">
+      <span class="btn-icon">📤</span>
+      <div class="btn-content">
+        <div class="btn-title">Xuất tất cả</div>
+        <div class="btn-subtitle">Tải về file JSON</div>
+      </div>
+    </button>
+    <button id="clearAll" class="danger-btn shimmer-effect">
+      <span class="btn-icon">🗑️</span>
+      <div class="btn-content">
+        <div class="btn-title">Xóa tất cả</div>
+        <div class="btn-subtitle">Xóa toàn bộ lịch sử</div>
+      </div>
+    </button>
+    <button id="refreshData" class="secondary-btn shimmer-effect">
+      <span class="btn-icon">🔄</span>
+      <div class="btn-content">
+        <div class="btn-title">Làm mới</div>
+        <div class="btn-subtitle">Tải lại dữ liệu</div>
+      </div>
+    </button>
+  </div>
+
+  <!-- History List -->
+  <div class="history-list" id="historyList">
+    <!-- History items will be dynamically inserted here -->
+  </div>
+
+  <!-- Empty State -->
+  <div class="empty-state" id="emptyState" hidden>
+    <div class="empty-icon">📋</div>
+    <h3>Chưa có lịch sử phân tích</h3>
+    <p>Bạn chưa thực hiện phân tích nào. Hãy bắt đầu bằng cách phân tích một trang web!</p>
+    <button id="goToPopup" class="primary-btn">
+      <span class="btn-icon">🛡️</span>
+      <div class="btn-content">
+        <div class="btn-title">Bắt đầu phân tích</div>
+        <div class="btn-subtitle">Quay lại popup chính</div>
+      </div>
+    </button>
+  </div>
+
+  <!-- Loading State -->
+  <div class="loading-state" id="loadingState">
+    <div class="loading-spinner"></div>
+    <p>Đang tải lịch sử...</p>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <script src="history.js"></script>
+</body>
+</html>

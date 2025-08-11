@@ -1,50 +1,102 @@
 <!doctype html>
-<html lang="vi">
+<html lang="vi" data-theme="light">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>ChongLuaDao AI Evidence</title>
   <link rel="stylesheet" href="styles.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 </head>
 <body>
-  <div class="header">
-    <h3>🛡️ ChongLuaDao AI Evidence</h3>
+  <!-- Theme Toggle -->
+  <button class="theme-toggle" id="themeToggle" title="Chuyển đổi giao diện">
+    <span class="theme-icon">🌙</span>
+  </button>
+
+  <div class="header shimmer-effect">
+    <h3 class="gradient-text">🛡️ ChongLuaDao AI Evidence</h3>
     <p class="subtitle">Phát hiện lừa đảo bằng AI - Bằng chứng chuyên sâu</p>
   </div>
   
-  <div class="main-section">
-    <p class="description">
-      📸 Chụp TOÀN BỘ trang → 🤖 AI phân tích chuyên sâu → 🚨 Phát hiện chợ đen/CCV → 🎨 Vẽ bằng chứng → ☁️ Upload
+  <div class="main-section hover-lift">
+    <p class="description gradient-text">
+      📸 Chụp TOÀN BỘ trang → 🤖 AI phân tích chuyên sâu → 🚨 Báo cáo chuyên sâu
     </p>
     
     <div class="button-group">
-      <button id="run" class="primary-btn">
+      <button id="run" class="primary-btn shimmer-effect">
         <span class="btn-icon">📸</span>
-        Quét Full Page & Phân tích AI
+        <div class="btn-content">
+          <div class="btn-title">Quét Full Page & Phân tích AI</div>
+          <div class="btn-subtitle">Phân tích chi tiết toàn trang</div>
+        </div>
       </button>
-      <button id="runQuick" class="secondary-btn">
+      <button id="runQuick" class="secondary-btn shimmer-effect">
         <span class="btn-icon">⚡</span>
-        Chụp Nhanh & Phân tích
+        <div class="btn-content">
+          <div class="btn-title">Chụp Nhanh & Phân tích</div>
+          <div class="btn-subtitle">Phân tích nhanh viewport</div>
+        </div>
       </button>
     </div>
     
     <div class="button-group">
-      <a class="config-link" href="options.html" target="_blank">
+      <a class="config-link shimmer-effect" href="options.html" target="_blank">
         <span class="btn-icon">⚙️</span>
-        Cấu hình API
+        <div class="btn-content">
+          <div class="btn-title">Cấu hình API</div>
+          <div class="btn-subtitle">Thiết lập Gemini API</div>
+        </div>
       </a>
     </div>
     
     <div class="button-group">
-      <button id="history" class="secondary-btn">
+      <button id="history" class="secondary-btn shimmer-effect">
         <span class="btn-icon">📋</span>
-        Xem lịch sử
+        <div class="btn-content">
+          <div class="btn-title">Xem lịch sử</div>
+          <div class="btn-subtitle">Danh sách phân tích</div>
+        </div>
       </button>
-      <button id="clear" class="danger-btn">
+      <button id="clear" class="danger-btn shimmer-effect">
         <span class="btn-icon">🗑️</span>
-        Xoá lịch sử
+        <div class="btn-content">
+          <div class="btn-title">Xoá lịch sử</div>
+          <div class="btn-subtitle">Xóa tất cả dữ liệu</div>
+        </div>
       </button>
     </div>
+  </div>
+
+  <!-- Progress Section -->
+  <div id="progressSection" class="progress-section" hidden>
+    <div class="progress-header">
+      <h4>🔄 Đang phân tích...</h4>
+      <div class="progress-steps">
+        <div class="step active" data-step="1">
+          <span class="step-icon">📸</span>
+          <span class="step-text">Chụp ảnh</span>
+        </div>
+        <div class="step" data-step="2">
+          <span class="step-icon">🤖</span>
+          <span class="step-text">AI phân tích</span>
+        </div>
+        <div class="step" data-step="3">
+          <span class="step-icon">🎨</span>
+          <span class="step-text">Vẽ bằng chứng</span>
+        </div>
+        <div class="step" data-step="4">
+          <span class="step-icon">☁️</span>
+          <span class="step-text">Upload</span>
+        </div>
+      </div>
+    </div>
+    <div class="progress-bar">
+      <div class="progress-fill" id="progressFill"></div>
+    </div>
+    <div id="progressText" class="progress-text">Đang khởi tạo...</div>
   </div>
 
   <div id="status" class="status"></div>
@@ -52,22 +104,39 @@
   <div id="result" class="result-container" hidden>
     <div class="result-header">
       <h4>📊 Kết quả phân tích:</h4>
-      <button id="copyReport" class="copy-btn">
-        <span class="btn-icon">📋</span>
-        Copy báo cáo
-      </button>
-      <button id="fillForm" class="copy-btn">
-        <span class="btn-icon">📝</span>
-        Điền Form ChongLuaDao
-      </button>
+      <div class="result-actions">
+        <button id="copyReport" class="copy-btn">
+          <span class="btn-icon">📋</span>
+          Copy báo cáo
+        </button>
+        <button id="fillForm" class="copy-btn">
+          <span class="btn-icon">📝</span>
+          Điền Form ChongLuaDao
+        </button>
+      </div>
     </div>
-    <pre id="resultData"></pre>
+    <div class="result-content">
+      <pre id="resultData"></pre>
+    </div>
   </div>
   
   <div id="historyList" class="history-container" hidden>
-    <h4>📜 Lịch sử phân tích:</h4>
-    <pre id="historyData"></pre>
+    <div class="history-header">
+      <h4>📜 Lịch sử phân tích:</h4>
+      <div class="history-actions">
+        <button id="exportHistory" class="copy-btn">
+          <span class="btn-icon">📤</span>
+          Xuất dữ liệu
+        </button>
+      </div>
+    </div>
+    <div class="history-content">
+      <pre id="historyData"></pre>
+    </div>
   </div>
+
+  <!-- Toast Container -->
+  <div id="toastContainer" class="toast-container"></div>
 
   <script src="popup.js"></script>
 </body>
