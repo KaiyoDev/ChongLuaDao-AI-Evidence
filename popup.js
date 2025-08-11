@@ -26,10 +26,20 @@ function showHistory(data) {
   $("#historyData").textContent = JSON.stringify(data, null, 2);
 }
 
-// Main analysis function
+// Main analysis function (Full Page)
 $("#run").addEventListener("click", async () => {
+  await runAnalysis("FULL_PAGE");
+});
+
+// Quick analysis function (Current View)
+$("#runQuick").addEventListener("click", async () => {
+  await runAnalysis("QUICK");
+});
+
+async function runAnalysis(mode = "FULL_PAGE") {
   try {
-    setStatus("🔄 Đang chụp màn hình và phân tích...", "loading");
+    const statusText = mode === "QUICK" ? "⚡ Đang chụp viewport hiện tại..." : "📸 Đang chụp toàn bộ trang web...";
+    setStatus(statusText, "loading");
     $("#result").hidden = true;
     $("#historyList").hidden = true;
 
@@ -39,7 +49,8 @@ $("#run").addEventListener("click", async () => {
     // Send message to background script
     const response = await chrome.runtime.sendMessage({ 
       type: "RUN_CAPTURE_AND_ANALYZE", 
-      tabId: tab.id 
+      tabId: tab.id,
+      captureMode: mode
     });
 
     if (!response?.ok) {
@@ -52,18 +63,22 @@ $("#run").addEventListener("click", async () => {
     // Hiển thị báo cáo text đẹp thay vì JSON
     const reportText = report.reportText || "Không có báo cáo";
     currentReportText = reportText; // Lưu để copy sau
+    currentReportData = report; // Lưu để điền form
     
     // Format display data cho JSON view (backup)
     const riskInfo = formatRiskLevel(aiData.risk || 0);
     const displayData = {
       "🔍 Tóm tắt": aiData.summary || "Không xác định",
       "⚠️ Mức rủi ro": `${aiData.risk || 0}/10 - ${riskInfo.text}`,
-      "📝 Bằng chứng": aiData.evidence_text || "Không có",
-      "🔎 Phát hiện": aiData.findings || [],
+      "📝 Bằng chứng chi tiết": aiData.evidence_text || "Không có",
+      "⚙️ Phân tích kỹ thuật": aiData.technical_analysis || "Chưa có",
+      "💡 Khuyến nghị": aiData.recommendation || "Cần thận trọng",
+      "🔎 Các phát hiện": aiData.findings || [],
       "🌐 URL": report.url || "",
       "⏰ Thời gian": new Date(report.time).toLocaleString("vi-VN"),
       "📤 Upload": {
-        "Ảnh gốc": report.uploads?.original?.link || "Lỗi upload",
+        "Ảnh viewport": report.uploads?.currentView?.link || "Lỗi upload",
+        "Ảnh toàn trang": report.uploads?.fullPage?.link || "Lỗi upload",
         "Ảnh chú thích": report.uploads?.annotated?.link || "Lỗi upload"
       }
     };
@@ -92,7 +107,7 @@ $("#run").addEventListener("click", async () => {
     setStatus(`❌ Lỗi: ${error.message}`, "error");
     console.error("Analysis error:", error);
   }
-});
+}
 
 // History functions
 $("#history").addEventListener("click", async () => {
@@ -155,6 +170,7 @@ $("#clear").addEventListener("click", async () => {
 
 // Copy report function
 let currentReportText = "";
+let currentReportData = null;
 
 $("#copyReport").addEventListener("click", async () => {
   if (!currentReportText) {
@@ -167,6 +183,28 @@ $("#copyReport").addEventListener("click", async () => {
     setStatus("✅ Đã copy báo cáo vào clipboard!", "success");
   } catch (error) {
     setStatus("❌ Không thể copy báo cáo", "error");
+  }
+});
+
+// Fill ChongLuaDao form function
+$("#fillForm").addEventListener("click", async () => {
+  if (!currentReportData) {
+    setStatus("❌ Không có dữ liệu để điền form", "error");
+    return;
+  }
+  
+  try {
+    setStatus("🔄 Đang mở trang ChongLuaDao...", "loading");
+    
+    // Gửi thông tin đến background script để xử lý
+    await chrome.runtime.sendMessage({ 
+      type: "FILL_CHONGLUADAO_FORM", 
+      reportData: currentReportData 
+    });
+    
+    setStatus("✅ Đã mở form ChongLuaDao!", "success");
+  } catch (error) {
+    setStatus(`❌ Lỗi: ${error.message}`, "error");
   }
 });
 

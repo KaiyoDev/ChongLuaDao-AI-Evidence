@@ -15,17 +15,20 @@ function setStatus(message, type = "info") {
       geminiApiKey, 
       geminiModel, 
       geminiEndpointBase, 
-      apiHeaders 
+      apiHeaders,
+      userEmail 
     } = await chrome.storage.sync.get([
       "geminiApiKey",
       "geminiModel", 
       "geminiEndpointBase",
-      "apiHeaders"
+      "apiHeaders",
+      "userEmail"
     ]);
 
     if (geminiApiKey) $("#geminiApiKey").value = geminiApiKey;
     if (geminiModel) $("#geminiModel").value = geminiModel;
     if (geminiEndpointBase) $("#geminiEndpointBase").value = geminiEndpointBase;
+    if (userEmail) $("#userEmail").value = userEmail;
     
     if (apiHeaders) {
       $("#apiHeaders").value = JSON.stringify(apiHeaders, null, 2);
@@ -70,6 +73,7 @@ $("#save").addEventListener("click", async () => {
     const geminiModel = $("#geminiModel").value.trim() || "gemini-2.0-flash";
     const geminiEndpointBase = $("#geminiEndpointBase").value.trim() || 
                                "https://generativelanguage.googleapis.com";
+    const userEmail = $("#userEmail").value.trim();
 
     // Validate endpoint URL
     try {
@@ -83,7 +87,8 @@ $("#save").addEventListener("click", async () => {
       geminiApiKey, 
       geminiModel, 
       geminiEndpointBase, 
-      apiHeaders 
+      apiHeaders,
+      userEmail 
     });
 
     setStatus("✅ Đã lưu cấu hình thành công!", "success");
