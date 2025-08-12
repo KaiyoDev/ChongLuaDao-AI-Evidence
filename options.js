@@ -1,24 +1,6 @@
 const $ = (s) => document.querySelector(s);
 
-// Theme Management
-let currentTheme = localStorage.getItem('theme') || 'light';
-
-function initTheme() {
-  document.documentElement.setAttribute('data-theme', currentTheme);
-  updateThemeIcon();
-}
-
-function toggleTheme() {
-  currentTheme = currentTheme === 'light' ? 'dark' : 'light';
-  document.documentElement.setAttribute('data-theme', currentTheme);
-  localStorage.setItem('theme', currentTheme);
-  updateThemeIcon();
-}
-
-function updateThemeIcon() {
-  const themeIcon = $('.theme-icon');
-  themeIcon.textContent = currentTheme === 'light' ? '🌙' : '☀️';
-}
+// Removed theme management - using green/white theme only
 
 // Toast Notification System
 function showToast(message, type = 'info', duration = 4000) {
@@ -274,10 +256,6 @@ function debounce(func, wait) {
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
-  initTheme();
-  
-  // Theme toggle
-  $('#themeToggle').addEventListener('click', toggleTheme);
   
   // Load configuration
   loadConfig();

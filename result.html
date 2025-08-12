@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="vi" data-theme="light">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Kết quả phân tích - ChongLuaDao AI Evidence</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body class="result-page">
+  <!-- Theme Toggle -->
+  <button class="theme-toggle" id="themeToggle" title="Chuyển đổi giao diện">
+    <span class="theme-icon">🌙</span>
+  </button>
+
+  <div class="header shimmer-effect">
+    <h2 class="gradient-text">📊 Kết quả phân tích chi tiết</h2>
+    <p class="subtitle">Báo cáo an ninh mạng đầy đủ</p>
+  </div>
+
+  <!-- Result Details -->
+  <div class="result-full-container">
+    <!-- Risk Overview -->
+    <div class="risk-overview-section">
+      <div class="risk-card">
+        <div class="risk-icon" id="riskIcon">🚨</div>
+        <div class="risk-content">
+          <div class="risk-level" id="riskLevel">0/10</div>
+          <div class="risk-label" id="riskLabel">Đang phân tích...</div>
+        </div>
+      </div>
+      
+      <div class="meta-info">
+        <div class="meta-item">
+          <span class="meta-label">URL:</span>
+          <span class="meta-value" id="analyzeUrl">Đang tải...</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Thời gian:</span>
+          <span class="meta-value" id="analyzeTime">Đang tải...</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Phát hiện:</span>
+          <span class="meta-value" id="findingsCount">0 dấu hiệu</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary Section -->
+    <div class="content-section">
+      <h3>📝 Tóm tắt phân tích</h3>
+      <div class="content-card">
+        <p id="summaryContent">Đang tải...</p>
+      </div>
+    </div>
+
+    <!-- Findings Section -->
+    <div class="content-section">
+      <h3>🔍 Các dấu hiệu phát hiện</h3>
+      <div class="findings-list" id="findingsList">
+        <div class="loading-text">Đang tải...</div>
+      </div>
+    </div>
+
+    <!-- Evidence Section -->
+    <div class="content-section">
+      <h3>📋 Bằng chứng chi tiết</h3>
+      <div class="content-card">
+        <div class="evidence-content" id="evidenceContent">Đang tải...</div>
+      </div>
+    </div>
+
+    <!-- Technical Analysis Section -->
+    <div class="content-section">
+      <h3>⚙️ Phân tích kỹ thuật</h3>
+      <div class="content-card">
+        <div class="technical-content" id="technicalContent">Đang tải...</div>
+      </div>
+    </div>
+
+    <!-- Recommendation Section -->
+    <div class="content-section">
+      <h3>💡 Khuyến nghị</h3>
+      <div class="content-card recommendation-card">
+        <div class="recommendation-content" id="recommendationContent">Đang tải...</div>
+      </div>
+    </div>
+
+    <!-- Images Section -->
+    <div class="content-section">
+      <h3>📸 Ảnh bằng chứng</h3>
+      <div class="images-grid" id="imagesGrid">
+        <div class="loading-text">Đang tải...</div>
+      </div>
+    </div>
+
+    <!-- Actions Section -->
+    <div class="actions-section">
+      <button id="copyFullReport" class="primary-btn shimmer-effect">
+        <span class="btn-icon">📋</span>
+        <div class="btn-content">
+          <div class="btn-title">Copy báo cáo đầy đủ</div>
+          <div class="btn-subtitle">Sao chép toàn bộ nội dung</div>
+        </div>
+      </button>
+      <button id="fillFormFromResult" class="secondary-btn shimmer-effect">
+        <span class="btn-icon">📝</span>
+        <div class="btn-content">
+          <div class="btn-title">Điền Form ChongLuaDao</div>
+          <div class="btn-subtitle">Báo cáo tự động</div>
+        </div>
+      </button>
+      <button id="exportPDF" class="secondary-btn shimmer-effect">
+        <span class="btn-icon">📄</span>
+        <div class="btn-content">
+          <div class="btn-title">Xuất PDF</div>
+          <div class="btn-subtitle">Lưu file báo cáo</div>
+        </div>
+      </button>
+      <button id="backToPopup" class="danger-btn shimmer-effect">
+        <span class="btn-icon">↩️</span>
+        <div class="btn-content">
+          <div class="btn-title">Quay lại</div>
+          <div class="btn-subtitle">Đóng tab này</div>
+        </div>
+      </button>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <script src="result.js"></script>
+</body>
+</html>

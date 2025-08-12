@@ -11,7 +11,7 @@
   "icons": { "128": "icons/icon128.png" },
   "web_accessible_resources": [
     {
-      "resources": ["history.html"],
+      "resources": ["history.html", "result.html"],
       "matches": ["<all_urls>"]
     }
   ]

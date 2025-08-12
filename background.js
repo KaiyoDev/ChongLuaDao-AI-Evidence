@@ -1397,18 +1397,33 @@ async function annotateWithAI(dataUrl, report) {
 // Lưu lịch sử (tối đa 300 entries)
 async function pushHistory(entry) {
   const KEY = "analysis_history";
-  console.log('Pushing history entry:', entry);
+  console.log('📝 Pushing history entry:', {
+    url: entry.url,
+    time: entry.time,
+    hasAI: !!entry.ai,
+    risk: entry.ai?.risk
+  });
   
   try {
     const { [KEY]: list = [] } = await chrome.storage.local.get([KEY]);
-    console.log('Current history list length:', list.length);
+    console.log('📊 Current history list length:', list.length);
     
+    // Add entry to beginning of array
     list.unshift(entry);
-    await chrome.storage.local.set({ [KEY]: list.slice(0, 300) });
+    const trimmedList = list.slice(0, 300);
     
-    console.log('History saved successfully, new length:', list.length);
+    // Save back to storage
+    await chrome.storage.local.set({ [KEY]: trimmedList });
+    
+    console.log('✅ History saved successfully, new length:', trimmedList.length);
+    
+    // Verify save
+    const { [KEY]: verifyList = [] } = await chrome.storage.local.get([KEY]);
+    console.log('🔍 Verification - saved entries:', verifyList.length);
+    
+    return true;
   } catch (error) {
-    console.error('Error saving history:', error);
+    console.error('❌ Error saving history:', error);
     throw error;
   }
 }
@@ -1757,9 +1772,16 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         };
 
         // 7) Lưu vào lịch sử
-        console.log('Saving report to history...');
-        await pushHistory(report);
-        console.log('Report saved, sending response...');
+        console.log('✅ Saving report to history...');
+        try {
+          await pushHistory(report);
+          console.log('✅ Report saved to history successfully');
+        } catch (historyError) {
+          console.error('❌ Error saving to history:', historyError);
+          // Continue anyway - don't fail the whole analysis
+        }
+        
+        console.log('📤 Sending response to popup...');
         sendResponse({ ok: true, report });
       }
 
