@@ -3,9 +3,42 @@ console.log("Background script loaded");
 
 // ===== Helpers =====
 const API_UPLOAD = "https://chongluadao.vn/api/upload-image";
+const API_CHECK_URL = "https://kaiyobot.gis-humg.com/api/checkurl?url=";
 
 const nowIso = () => new Date().toISOString();
 const dataUrlToBase64 = (d) => d.split(",")[1];
+
+// Kiểm tra URL có nguy hiểm không trước khi quét
+async function checkUrlSafety(url) {
+  try {
+    console.log(`Checking URL safety: ${url}`);
+    const response = await fetch(`${API_CHECK_URL}${encodeURIComponent(url)}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
+      console.warn(`URL safety check failed with status: ${response.status}`);
+      return {
+        success: false,
+        data: { result: "unknown", riskLevel: "unknown", message: "Không thể kiểm tra an toàn URL" }
+      };
+    }
+    
+    const data = await response.json();
+    console.log('URL safety check result:', data);
+    
+    return data;
+  } catch (error) {
+    console.error('Error checking URL safety:', error);
+    return {
+      success: false,
+      data: { result: "unknown", riskLevel: "unknown", message: "Lỗi khi kiểm tra an toàn URL" }
+    };
+  }
+}
 
 // Nén ảnh thông minh để tránh lỗi 413 (Payload Too Large)
 async function compressImage(dataUrl, maxWidth = 1200, quality = 0.7) {
@@ -79,9 +112,96 @@ function generateShortEvidence(aiData, reportUrl) {
   // Thêm URL và thời gian
   evidenceText += `\nURL ĐƯỢC PHÂN TÍCH: ${reportUrl}`;
   evidenceText += `\nTHỜI GIAN PHÂN TÍCH: ${new Date().toLocaleString('vi-VN')}`;
-  evidenceText += `\n\nPhân tích bởi: ChongLuaDao AI Evidence Extension v2.7.0`;
+  evidenceText += `\n\nPhân tích bởi: ChongLuaDao AI Evidence Extension v2.9.0`;
   
   return evidenceText;
+}
+
+// Tạo báo cáo văn bản chi tiết từ AI analysis
+function generateReportText(aiData, uploadUrls) {
+  const { url, capturedAt, urlSafetyData } = aiData;
+  const risk = aiData.risk || 0;
+  const findings = aiData.findings || [];
+  const summary = aiData.summary || "Đang phân tích...";
+  const evidenceText = aiData.evidence_text || "";
+  const technicalAnalysis = aiData.technical_analysis || "";
+  const recommendation = aiData.recommendation || "";
+  const websiteCategory = aiData.website_category || "unknown";
+  const threatLevel = aiData.threat_level || "LOW";
+  const confidenceScore = aiData.confidence_score || 85;
+  
+  // Tạo báo cáo chi tiết
+  let report = `# 🛡️ BÁO CÁO PHÂN TÍCH AN NINH MẠNG
+
+## 📊 THÔNG TIN TỔNG QUAN
+🌐 **URL phân tích:** ${url}
+⏰ **Thời gian:** ${new Date(capturedAt).toLocaleString('vi-VN')}
+📊 **Mức độ rủi ro:** ${risk}/10 - ${risk >= 8 ? '🔴 CỰC NGUY HIỂM' : risk >= 6 ? '🟠 NGUY HIỂM' : risk >= 4 ? '🟡 THẬN TRỌNG' : '🟢 AN TOÀN'}
+🎯 **Phân loại:** ${websiteCategory}
+⚠️ **Mức độ đe dọa:** ${threatLevel}
+🎯 **Độ tin cậy:** ${confidenceScore}%
+
+`;
+
+  // Thêm thông tin kiểm tra URL safety nếu có
+  if (urlSafetyData && urlSafetyData.success && urlSafetyData.data) {
+    const safetyData = urlSafetyData.data;
+    report += `## 🔍 KẾT QUẢ KIỂM TRA AN TOÀN URL
+📡 **Kết quả quét:** ${safetyData.result} (${safetyData.riskLevel})
+📢 **Thông báo:** ${safetyData.message}
+📊 **Thống kê quét:** ${safetyData.summary?.total || 0} nguồn, ${safetyData.summary?.safe || 0} an toàn, ${safetyData.summary?.unsafe || 0} nguy hiểm
+
+`;
+
+    if (safetyData.details?.unsafe?.length > 0) {
+      report += `⚠️ **Nguồn cảnh báo nguy hiểm:**\n`;
+      safetyData.details.unsafe.forEach(item => {
+        report += `   • ${item.api.split('/').pop()}: ${item.note}\n`;
+      });
+      report += `\n`;
+    }
+  }
+
+  report += `## 📝 TÓM TẮT ĐÁNH GIÁ
+${summary}
+
+## 🔍 CÁC DẤU HIỆU PHÁT HIỆN (${findings.length})
+`;
+
+  findings.forEach((finding, index) => {
+    report += `${index + 1}. ${finding}\n`;
+  });
+
+  report += `
+## 📋 BẰNG CHỨNG CHI TIẾT
+${evidenceText}
+
+## 🔧 PHÂN TÍCH KỸ THUẬT
+${technicalAnalysis}
+
+## 💡 KHUYẾN NGHỊ
+${recommendation}
+
+## 📷 HÌNH ẢNH BẰNG CHỨNG
+`;
+
+  if (uploadUrls.currentView && uploadUrls.currentView !== 'Failed to upload') {
+    report += `• **Ảnh viewport:** ${uploadUrls.currentView}\n`;
+  }
+  if (uploadUrls.fullPage && uploadUrls.fullPage !== 'Failed to upload') {
+    report += `• **Ảnh toàn trang:** ${uploadUrls.fullPage}\n`;
+  }
+  if (uploadUrls.annotated && uploadUrls.annotated !== 'Failed to upload') {
+    report += `• **Ảnh phân tích:** ${uploadUrls.annotated}\n`;
+  }
+
+  report += `
+---
+**🤖 Phân tích bởi:** ChongLuaDao AI Evidence Extension v2.9.0
+**⏱️ Thời gian tạo báo cáo:** ${new Date().toLocaleString('vi-VN')}
+`;
+
+  return report;
 }
 
 // Tạo bằng chứng chi tiết dựa trên AI analysis - tập trung vào BẰNG CHỨNG CỤ THỂ
@@ -1429,26 +1549,51 @@ async function pushHistory(entry) {
 }
 
 // ===== Gemini (Google Generative Language API) =====
-function buildGeminiPrompt(context) {
-  return `
-Bạn là chuyên gia an ninh mạng và phân tích lừa đảo web hàng đầu. Phân tích CHI TIẾT hình ảnh và nội dung trang web để đưa ra đánh giá RỦI RO toàn diện.
+function buildGeminiPrompt(context, urlSafetyData = null) {
+  // Tích hợp thông tin an toàn URL vào prompt nếu có
+  let urlSafetyContext = '';
+  if (urlSafetyData && urlSafetyData.success && urlSafetyData.data) {
+    const { result, riskLevel, message, summary, details } = urlSafetyData.data;
+    urlSafetyContext = `
+THÔNG TIN AN TOÀN URL ĐÃ KIỂM TRA:
+- Kết quả tổng quát: ${result} (mức độ rủi ro: ${riskLevel})
+- Thông báo: ${message}
+- Tổng kết quét: ${summary?.total || 0} nguồn kiểm tra, ${summary?.safe || 0} an toàn, ${summary?.unsafe || 0} nguy hiểm, ${summary?.unknown || 0} không xác định
+${details?.unsafe?.length > 0 ? `- Nguồn cảnh báo nguy hiểm: ${details.unsafe.map(u => u.api + ': ' + u.note).join('; ')}` : ''}
+${details?.safe?.length > 0 ? `- Số nguồn xác nhận an toàn: ${details.safe.length}` : ''}
 
-YÊU CẦU PHÂN TÍCH CHUYÊN SÂU:
-1. Kiểm tra mọi element trên giao diện (buttons, forms, links, images)
-2. Phân tích ngôn ngữ marketing và các từ khóa câu kéo
-3. Đánh giá thiết kế UX/UI có dấu hiệu manipulative không
-4. Kiểm tra domain authority và trust signals
-5. Phân tích các script và redirects đáng ngờ
-6. Đánh giá tính hợp pháp của dịch vụ được quảng cáo
+QUAN TRỌNG: Hãy tích hợp thông tin này vào phân tích để đưa ra đánh giá chính xác hơn.
+`;
+  }
+
+  return `
+Bạn là chuyên gia an ninh mạng và phân tích lừa đảo web hàng đầu. Phân tích TOÀN DIỆN và CHUYÊN SÂU hình ảnh cùng nội dung trang web để đưa ra đánh giá RỦI RO chi tiết nhất.
+
+${urlSafetyContext}
+
+YÊU CẦU PHÂN TÍCH CHUYÊN SÂU - QUÉT TOÀN BỘ TRANG WEB:
+1. 🔍 QUÉT GỚI GIAO DIỆN: Phân tích từng element (buttons, forms, links, images, icons, menus)
+2. 📝 PHÂN TÍCH NGÔN NGỮ: Kiểm tra từ khóa marketing, ngôn ngữ thuyết phục, lời hứa hẹn
+3. 🎨 ĐÁNH GIÁ THIẾT KẾ: UX/UI manipulative, copy design, color psychology
+4. 🌐 KIỂM TRA DOMAIN: Authority, trust signals, SSL, subdomain patterns
+5. ⚙️ PHÂN TÍCH KỸ THUẬT: Scripts, redirects, tracking, obfuscation, API calls
+6. 🏛️ TÍNH HỢP PHÁP: Giấy phép, thông tin pháp lý, contact info validation
+7. 💰 RỦI RO TÀI CHÍNH: Payment methods, pricing strategy, investment promises
+8. 🔐 BẢO MẬT DỮ LIỆU: Form security, data collection practices, privacy policy
+9. 📱 MOBILE/APP: Download sources, permissions, store presence
+10. 🎯 SOCIAL ENGINEERING: Psychological tactics, urgency creation, trust exploitation
 
 TRẢ VỀ JSON DUY NHẤT theo schema:
 {
   "risk": <number 0-10>,
-  "summary": <string: tóm tắt 1-2 câu>,
-  "findings": [<mảng 8-12 dấu hiệu CỤ THỂ và CHI TIẾT bằng tiếng Việt>],
-  "evidence_text": <string: bằng chứng chi tiết 400-600 từ>,
-  "technical_analysis": <string: phân tích kỹ thuật 250-350 từ>,
-  "recommendation": <string: khuyến nghị cụ thể 100-150 từ>,
+  "summary": <string: tóm tắt 2-3 câu chi tiết>,
+  "findings": [<mảng 10-15 dấu hiệu CỤ THỂ và CHI TIẾT bằng tiếng Việt>],
+  "evidence_text": <string: bằng chứng chi tiết 500-800 từ>,
+  "technical_analysis": <string: phân tích kỹ thuật 300-450 từ>,
+  "recommendation": <string: khuyến nghị cụ thể 150-200 từ>,
+  "website_category": <string: phân loại website (ecommerce/investment/gaming/banking/news/social/etc)>,
+  "threat_level": <string: "LOW/MEDIUM/HIGH/CRITICAL">,
+  "confidence_score": <number 0-100>,
   "boxes": [{"x":num,"y":num,"w":num,"h":num,"label":str,"score":0-1}]
 }
 
@@ -1610,7 +1755,7 @@ ${(context.html_snippet || "").slice(0, 12000)}
 Viết evidence_text như báo cáo chuyên gia (300+ từ) và technical_analysis chi tiết về cấu trúc trang. Recommendation phải cụ thể dựa trên full context của trang.`;
 }
 
-async function callGemini({ apiKey, model, imageBase64, context, endpointBase }) {
+async function callGemini({ apiKey, model, imageBase64, context, endpointBase, urlSafetyData = null }) {
   const endpoint =
     (endpointBase || "https://generativelanguage.googleapis.com") +
     `/v1beta/models/${encodeURIComponent(model || "gemini-2.0-flash")}:generateContent?key=${encodeURIComponent(apiKey)}`;
@@ -1619,13 +1764,13 @@ async function callGemini({ apiKey, model, imageBase64, context, endpointBase })
     contents: [{
       role: "user",
       parts: [
-        { text: buildGeminiPrompt(context) },
+        { text: buildGeminiPrompt(context, urlSafetyData) },
         { inlineData: { mimeType: "image/png", data: imageBase64 } }
       ]
     }],
     generationConfig: {
       temperature: 0.1,
-      maxOutputTokens: 3000,
+      maxOutputTokens: 4000, // Tăng lên 4000 cho phân tích chuyên sâu hơn
       responseMimeType: "application/json"
     }
   };
@@ -1662,6 +1807,9 @@ async function callGemini({ apiKey, model, imageBase64, context, endpointBase })
   report.evidence_text = report.evidence_text || "Cần phân tích thêm để đưa ra đánh giá chính xác.";
   report.technical_analysis = report.technical_analysis || "Chưa có phân tích kỹ thuật chi tiết.";
   report.recommendation = report.recommendation || "Hãy thận trọng khi sử dụng trang web này.";
+  report.website_category = report.website_category || "unknown";
+  report.threat_level = report.threat_level || (report.risk >= 8 ? "CRITICAL" : report.risk >= 6 ? "HIGH" : report.risk >= 4 ? "MEDIUM" : "LOW");
+  report.confidence_score = typeof report.confidence_score === "number" ? Math.max(0, Math.min(100, report.confidence_score)) : 85;
   report.boxes = Array.isArray(report.boxes) ? report.boxes : [];
 
   return report;
@@ -1680,6 +1828,26 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           await chrome.storage.sync.get(["apiHeaders", "geminiApiKey", "geminiModel", "geminiEndpointBase"]);
 
         if (!geminiApiKey) throw new Error("Chưa cấu hình Gemini API Key trong Options.");
+
+        // 0) Kiểm tra an toàn URL trước khi quét (nếu không phải force scan)
+        let urlSafetyData = null;
+        if (!msg.forceScan) {
+          chrome.tabs.sendMessage(tabId, { type: "STATUS_UPDATE", message: "🔍 Đang kiểm tra an toàn URL..." }).catch(() => {});
+          
+          const [currentTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+          urlSafetyData = await checkUrlSafety(currentTab.url);
+          
+          console.log('URL Safety Check Result:', urlSafetyData);
+          
+          // Nếu URL nguy hiểm và người dùng chưa xác nhận tiếp tục
+          if (urlSafetyData?.success && urlSafetyData.data?.result === "unsafe") {
+            chrome.tabs.sendMessage(tabId, { 
+              type: "URL_SAFETY_WARNING", 
+              data: urlSafetyData.data 
+            }).catch(() => {});
+            return; // Dừng quét để chờ người dùng xác nhận
+          }
+        }
 
         // 1) Lấy context và chụp ảnh theo chế độ được chọn
         const ctx = await getPageContext(tabId);
@@ -1701,21 +1869,23 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         
         const shotBase64 = dataUrlToBase64(fullPageDataUrl); // Dùng full page cho AI analysis
 
-        // 2) Gọi Gemini phân tích
-        chrome.tabs.sendMessage(tabId, { type: "STATUS_UPDATE", message: "🤖 Đang phân tích bằng AI..." }).catch(() => {});
+        // 2) Gọi Gemini phân tích chuyên sâu
+        chrome.tabs.sendMessage(tabId, { type: "STATUS_UPDATE", message: "🤖 Đang phân tích chuyên sâu bằng AI..." }).catch(() => {});
         
         let aiReport = await callGemini({
           apiKey: geminiApiKey,
           model: geminiModel || "gemini-2.0-flash",
           imageBase64: shotBase64,
           context: ctx,
-          endpointBase: geminiEndpointBase
+          endpointBase: geminiEndpointBase,
+          urlSafetyData: urlSafetyData // Truyền thông tin safety check
         });
 
         // 3) Bổ sung thông tin
         aiReport.url = ctx.url;
         aiReport.capturedAt = nowIso();
         aiReport.context = ctx; // Lưu context để sử dụng trong báo cáo
+        aiReport.urlSafetyData = urlSafetyData; // Lưu kết quả kiểm tra an toàn URL
 
         // 4) Upload ảnh viewport hiện tại
         chrome.tabs.sendMessage(tabId, { type: "STATUS_UPDATE", message: "📤 Đang upload ảnh viewport..." }).catch(() => {});

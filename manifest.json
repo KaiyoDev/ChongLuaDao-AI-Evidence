@@ -2,12 +2,19 @@
   "manifest_version": 3,
   "name": "ChongLuaDao AI Evidence",
   "description": "Phân tích chuyên sâu các trang lừa đảo, chợ đen (CCV, tiền bẩn), tạo bằng chứng chi tiết bằng AI.",
-  "version": "2.8.0",
+  "version": "2.9.0",
   "action": { "default_popup": "popup.html" },
   "options_page": "options.html",
   "permissions": ["activeTab", "scripting", "tabs", "storage"],
-  "host_permissions": ["https://chongluadao.vn/*", "https://generativelanguage.googleapis.com/*"],
+  "host_permissions": ["https://chongluadao.vn/*", "https://generativelanguage.googleapis.com/*", "https://kaiyobot.gis-humg.com/*"],
   "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content-script.js"],
+      "run_at": "document_end"
+    }
+  ],
   "icons": { "128": "icons/icon128.png" },
   "web_accessible_resources": [
     {

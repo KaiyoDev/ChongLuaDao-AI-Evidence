@@ -225,14 +225,40 @@ function generateSummary(report) {
   const aiData = report.ai || {};
   const riskLevel = aiData.risk || 0;
   const findings = aiData.findings || [];
+  const websiteCategory = aiData.website_category || 'unknown';
+  const threatLevel = aiData.threat_level || 'LOW';
+  const confidenceScore = aiData.confidence_score || 85;
   
   let riskText = 'An toàn';
   if (riskLevel > 6) riskText = 'Nguy hiểm';
   else if (riskLevel > 3) riskText = 'Thận trọng';
   
+  // Map category to Vietnamese
+  const categoryMap = {
+    'ecommerce': 'Thương mại điện tử',
+    'investment': 'Đầu tư / Tài chính',
+    'gaming': 'Game / Giải trí',
+    'banking': 'Ngân hàng',
+    'news': 'Tin tức',
+    'social': 'Mạng xã hội',
+    'casino': 'Casino / Cờ bạc',
+    'unknown': 'Chưa xác định'
+  };
+  
+  // Map threat level to Vietnamese  
+  const threatMap = {
+    'LOW': '🟢 Thấp',
+    'MEDIUM': '🟡 Trung bình', 
+    'HIGH': '🟠 Cao',
+    'CRITICAL': '🔴 Cực nguy hiểm'
+  };
+  
   return `
     <div class="summary-content">
       <p><strong>Mức độ rủi ro:</strong> ${riskLevel}/10 - <span class="risk-${riskLevel <= 3 ? 'low' : riskLevel <= 6 ? 'medium' : 'high'}">${riskText}</span></p>
+      <p><strong>Mức độ đe dọa:</strong> ${threatMap[threatLevel] || threatLevel}</p>
+      <p><strong>Phân loại website:</strong> ${categoryMap[websiteCategory] || websiteCategory}</p>
+      <p><strong>Độ tin cậy phân tích:</strong> ${confidenceScore}%</p>
       <p><strong>Phát hiện:</strong> ${findings.length} dấu hiệu đáng chú ý</p>
       <p><strong>Tóm tắt:</strong> ${aiData.summary || 'Không có thông tin tóm tắt'}</p>
     </div>
