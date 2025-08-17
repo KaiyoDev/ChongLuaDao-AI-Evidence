@@ -1,8 +1,8 @@
 // content-script.js - Xử lý hiển thị cảnh báo và status updates
 console.log("ChongLuaDao Content Script loaded");
 
-// Hiển thị status updates
-function showStatusUpdate(message) {
+// Hiển thị status updates với thanh tiến trình
+function showStatusUpdate(message, progress = null, step = null, totalSteps = null) {
   // Tìm hoặc tạo status overlay
   let statusOverlay = document.getElementById('chongluadao-status-overlay');
   if (!statusOverlay) {
@@ -14,14 +14,16 @@ function showStatusUpdate(message) {
       right: 20px;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: white;
-      padding: 12px 20px;
-      border-radius: 8px;
+      padding: 20px;
+      border-radius: 12px;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       font-size: 14px;
       font-weight: 500;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+      backdrop-filter: blur(10px);
       z-index: 999999;
-      max-width: 300px;
+      min-width: 320px;
+      max-width: 400px;
       animation: slideInRight 0.3s ease-out;
     `;
     document.body.appendChild(statusOverlay);
@@ -33,24 +35,100 @@ function showStatusUpdate(message) {
         from { transform: translateX(100%); opacity: 0; }
         to { transform: translateX(0); opacity: 1; }
       }
+      @keyframes progressGlow {
+        0% { box-shadow: 0 0 5px rgba(255,255,255,0.3); }
+        50% { box-shadow: 0 0 20px rgba(255,255,255,0.6); }
+        100% { box-shadow: 0 0 5px rgba(255,255,255,0.3); }
+      }
     `;
     document.head.appendChild(style);
   }
   
-  statusOverlay.textContent = message;
+  // Tạo nội dung với progress bar
+  let content = `
+    <div style="margin-bottom: ${progress !== null ? '15px' : '0'};">
+      ${message}
+    </div>
+  `;
+  
+  if (progress !== null) {
+    const percentage = Math.max(0, Math.min(100, progress));
+    content += `
+      <div style="margin-bottom: 10px;">
+        <div style="
+          background: rgba(255,255,255,0.2);
+          border-radius: 10px;
+          height: 8px;
+          overflow: hidden;
+        ">
+          <div style="
+            background: linear-gradient(90deg, #10b981, #34d399);
+            height: 100%;
+            width: ${percentage}%;
+            border-radius: 10px;
+            transition: width 0.3s ease;
+            animation: progressGlow 2s infinite;
+          "></div>
+        </div>
+        <div style="
+          display: flex;
+          justify-content: space-between;
+          margin-top: 5px;
+          font-size: 12px;
+          opacity: 0.9;
+        ">
+          <span>${percentage.toFixed(0)}%</span>
+          ${step && totalSteps ? `<span>Bước ${step}/${totalSteps}</span>` : ''}
+        </div>
+      </div>
+    `;
+  }
+  
+  statusOverlay.innerHTML = content;
   statusOverlay.style.display = 'block';
   
-  // Auto hide sau 8 giây
-  setTimeout(() => {
-    if (statusOverlay && statusOverlay.style.display !== 'none') {
-      statusOverlay.style.display = 'none';
-    }
-  }, 8000);
+  // Auto hide sau 8 giây (trừ khi có progress đang chạy)
+  if (progress === null || progress >= 100) {
+    setTimeout(() => {
+      if (statusOverlay && statusOverlay.style.display !== 'none') {
+        statusOverlay.style.display = 'none';
+      }
+    }, 8000);
+  }
 }
 
-// Hiển thị cảnh báo URL nguy hiểm
-function showUrlSafetyWarning(safetyData) {
-  const { result, riskLevel, message, summary, details } = safetyData;
+// Hiển thị cảnh báo URL nguy hiểm hoặc domain đã báo cáo
+function showUrlSafetyWarning(data) {
+  const { urlSafety, domainReport, isUnsafeUrl, isDomainReported } = data;
+  
+  // Xác định thông tin hiển thị dựa trên loại cảnh báo
+  let warningTitle, warningIcon, mainMessage, riskLevel, riskColor;
+  
+  if (isDomainReported && isUnsafeUrl) {
+    warningTitle = "Cảnh báo nghiêm trọng!";
+    warningIcon = "🚫";
+    mainMessage = `Domain này vừa bị đánh dấu nguy hiểm VÀ đã được báo cáo trong tháng này!`;
+    riskLevel = "HIGH";
+    riskColor = "#dc2626";
+  } else if (isDomainReported) {
+    warningTitle = "Domain đã được báo cáo!";
+    warningIcon = "🚨";
+    mainMessage = domainReport.message || "Domain này đã được báo cáo trong tháng này";
+    riskLevel = "MEDIUM";
+    riskColor = "#f59e0b";
+  } else if (isUnsafeUrl) {
+    warningTitle = "Cảnh báo URL nguy hiểm!";
+    warningIcon = "⚠️";
+    mainMessage = urlSafety.message || "URL này được đánh dấu là nguy hiểm";
+    riskLevel = urlSafety.riskLevel?.toUpperCase() || "HIGH";
+    riskColor = "#dc2626";
+  } else {
+    warningTitle = "Thông báo an toàn";
+    warningIcon = "ℹ️";
+    mainMessage = "Đã phát hiện một số vấn đề cần lưu ý";
+    riskLevel = "LOW";
+    riskColor = "#10b981";
+  }
   
   // Tạo warning modal
   const modal = document.createElement('div');
@@ -81,57 +159,60 @@ function showUrlSafetyWarning(safetyData) {
     box-shadow: 0 20px 40px rgba(0,0,0,0.3);
   `;
   
-  // Risk level colors
-  const riskColors = {
-    high: '#dc2626',
-    medium: '#f59e0b', 
-    low: '#10b981',
-    unknown: '#6b7280'
-  };
-  
-  const riskColor = riskColors[riskLevel] || riskColors.unknown;
-  
   content.innerHTML = `
     <div style="text-align: center; margin-bottom: 20px;">
-      <div style="font-size: 48px; margin-bottom: 10px;">⚠️</div>
-      <h2 style="margin: 0; color: ${riskColor}; font-size: 24px;">Cảnh báo URL nguy hiểm!</h2>
+      <div style="font-size: 48px; margin-bottom: 10px;">${warningIcon}</div>
+      <h2 style="margin: 0; color: ${riskColor}; font-size: 24px;">${warningTitle}</h2>
     </div>
     
     <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
       <p style="margin: 0; color: #92400e; font-weight: 500;">
-        <strong>Mức độ rủi ro:</strong> ${riskLevel.toUpperCase()}<br>
-        <strong>Thông báo:</strong> ${message}
+        <strong>Mức độ rủi ro:</strong> ${riskLevel}<br>
+        <strong>Thông báo:</strong> ${mainMessage}
       </p>
     </div>
     
-    <div style="margin-bottom: 20px;">
-      <h3 style="margin-top: 0; color: #374151;">Chi tiết kiểm tra:</h3>
-      <p style="color: #6b7280; margin-bottom: 10px;">
-        <strong>Tổng kết:</strong> ${summary?.total || 0} nguồn kiểm tra, 
-        <span style="color: #10b981;">${summary?.safe || 0} an toàn</span>, 
-        <span style="color: #dc2626;">${summary?.unsafe || 0} nguy hiểm</span>
-      </p>
-      
-      ${details?.unsafe?.length > 0 ? `
-        <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; padding: 10px; margin-bottom: 10px;">
-          <h4 style="margin: 0 0 8px 0; color: #dc2626;">Nguồn cảnh báo nguy hiểm:</h4>
-          ${details.unsafe.map(item => `
-            <div style="margin-bottom: 5px; color: #7f1d1d;">
-              • <strong>${item.api.split('/').pop()}:</strong> ${item.note}
-            </div>
-          `).join('')}
-        </div>
-      ` : ''}
-      
-      ${details?.safe?.length > 0 ? `
-        <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; padding: 10px;">
-          <h4 style="margin: 0 0 8px 0; color: #15803d;">Các nguồn xác nhận an toàn (${details.safe.length}):</h4>
-          <div style="color: #166534; font-size: 13px;">
-            ${details.safe.map(item => item.api.split('/').pop()).join(', ')}
+    ${isDomainReported ? `
+      <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+        <h3 style="margin: 0 0 10px 0; color: #dc2626;">📋 Thông tin báo cáo domain:</h3>
+        <p style="margin: 0; color: #7f1d1d;">
+          <strong>Domain:</strong> ${domainReport.domain}<br>
+          <strong>Trạng thái:</strong> ${domainReport.reported ? 'Đã được báo cáo' : 'Chưa có báo cáo'}<br>
+          <strong>Thời gian:</strong> ${new Date(domainReport.timestamp).toLocaleString('vi-VN')}
+        </p>
+      </div>
+    ` : ''}
+    
+    ${isUnsafeUrl ? `
+      <div style="margin-bottom: 20px;">
+        <h3 style="margin-top: 0; color: #374151;">Chi tiết kiểm tra URL:</h3>
+        <p style="color: #6b7280; margin-bottom: 10px;">
+          <strong>Tổng kết:</strong> ${urlSafety?.summary?.total || 0} nguồn kiểm tra, 
+          <span style="color: #10b981;">${urlSafety?.summary?.safe || 0} an toàn</span>, 
+          <span style="color: #dc2626;">${urlSafety?.summary?.unsafe || 0} nguy hiểm</span>
+        </p>
+        
+        ${urlSafety?.details?.unsafe?.length > 0 ? `
+          <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; padding: 10px; margin-bottom: 10px;">
+            <h4 style="margin: 0 0 8px 0; color: #dc2626;">Nguồn cảnh báo nguy hiểm:</h4>
+            ${urlSafety.details.unsafe.map(item => `
+              <div style="margin-bottom: 5px; color: #7f1d1d;">
+                • <strong>${item.api.split('/').pop()}:</strong> ${item.note}
+              </div>
+            `).join('')}
           </div>
-        </div>
-      ` : ''}
-    </div>
+        ` : ''}
+        
+        ${urlSafety?.details?.safe?.length > 0 ? `
+          <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; padding: 10px;">
+            <h4 style="margin: 0 0 8px 0; color: #15803d;">Các nguồn xác nhận an toàn (${urlSafety.details.safe.length}):</h4>
+            <div style="color: #166534; font-size: 13px;">
+              ${urlSafety.details.safe.map(item => item.api.split('/').pop()).join(', ')}
+            </div>
+          </div>
+        ` : ''}
+      </div>
+    ` : ''}
     
     <div style="text-align: center;">
       <button id="chongluadao-cancel-scan" style="
@@ -193,13 +274,16 @@ function showUrlSafetyWarning(safetyData) {
   };
 }
 
+// Bỏ function showAnalysisComplete - không cần thông báo to nữa
+
 // Lắng nghe messages từ background script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log('Content script received message:', message);
   
   if (message.type === "STATUS_UPDATE") {
-    showStatusUpdate(message.message);
+    showStatusUpdate(message.message, message.progress, message.step, message.totalSteps);
   } else if (message.type === "URL_SAFETY_WARNING") {
     showUrlSafetyWarning(message.data);
   }
+  // Bỏ ANALYSIS_COMPLETE - không cần thông báo to nữa
 });
