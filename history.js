@@ -1,483 +1,356 @@
-const $ = (s) => document.querySelector(s);
-const $$ = (s) => document.querySelectorAll(s);
+// history.js
+console.log("History page loaded");
 
-// Removed theme management - using green/white theme only
+let historyData = [];
+let filteredData = [];
 
-// Toast Notification System
-function showToast(message, type = 'info', duration = 4000) {
-  const toastContainer = $('#toastContainer');
+// DOM elements
+const loadingState = document.getElementById('loadingState');
+const emptyState = document.getElementById('emptyState');
+const historyList = document.getElementById('historyList');
+const totalAnalyses = document.getElementById('totalAnalyses');
+const highRiskCount = document.getElementById('highRiskCount');
+const safeCount = document.getElementById('safeCount');
+const todayCount = document.getElementById('todayCount');
+
+// Filters
+const riskFilter = document.getElementById('riskFilter');
+const dateFilter = document.getElementById('dateFilter');
+const searchInput = document.getElementById('searchInput');
+
+// Buttons
+const exportAll = document.getElementById('exportAll');
+const clearAll = document.getElementById('clearAll');
+const refreshData = document.getElementById('refreshData');
+const goToPopup = document.getElementById('goToPopup');
+
+// Toast notifications
+function showToast(message, type = 'info') {
+  const toastContainer = document.getElementById('toastContainer');
   const toast = document.createElement('div');
-  toast.className = `toast ${type}`;
+  toast.className = `toast toast-${type}`;
   
-  const icons = {
-    success: '✅',
-    error: '❌',
-    warning: '⚠️',
-    info: 'ℹ️'
-  };
-  
+  const icon = type === 'success' ? '✅' : type === 'error' ? '❌' : type === 'warning' ? '⚠️' : 'ℹ️';
   toast.innerHTML = `
-    <div class="toast-header">
-      <span class="toast-icon">${icons[type]}</span>
-      <span class="toast-title">${type.charAt(0).toUpperCase() + type.slice(1)}</span>
-    </div>
-    <div class="toast-message">${message}</div>
+    <span class="toast-icon">${icon}</span>
+    <span class="toast-message">${message}</span>
   `;
   
   toastContainer.appendChild(toast);
   
-  // Auto remove after duration
+  // Auto remove after 3 seconds
   setTimeout(() => {
-    toast.style.animation = 'slideOutRight 0.3s ease';
+    toast.classList.add('fade-out');
     setTimeout(() => {
       if (toast.parentNode) {
         toast.parentNode.removeChild(toast);
       }
     }, 300);
-  }, duration);
-  
-  return toast;
+  }, 3000);
 }
 
-// Utility functions
+// Format risk level with color and icon
 function formatRiskLevel(risk) {
-  if (risk <= 2) return { text: "An toàn", color: "#22c55e", icon: "🟢", class: "low" };
-  if (risk <= 5) return { text: "Thận trọng", color: "#f59e0b", icon: "🟡", class: "medium" };
-  if (risk <= 8) return { text: "Nguy hiểm", color: "#ef4444", icon: "🔴", class: "high" };
-  return { text: "Cực nguy hiểm", color: "#dc2626", icon: "🚨", class: "high" };
+  if (risk >= 8) return { text: 'CỰC NGUY HIỂM', color: '#dc2626', icon: '🔴' };
+  if (risk >= 6) return { text: 'NGUY HIỂM', color: '#ea580c', icon: '🟠' };
+  if (risk >= 4) return { text: 'THẬN TRỌNG', color: '#ca8a04', icon: '🟡' };
+  return { text: 'AN TOÀN', color: '#16a34a', icon: '🟢' };
 }
 
+// Format date
 function formatDate(dateString) {
   const date = new Date(dateString);
   const now = new Date();
-  const diffTime = Math.abs(now - date);
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  const diff = now - date;
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
   
-  if (diffDays === 1) return 'Hôm qua';
-  if (diffDays === 0) return 'Hôm nay';
-  if (diffDays < 7) return `${diffDays} ngày trước`;
+  if (minutes < 1) return 'Vừa xong';
+  if (minutes < 60) return `${minutes} phút trước`;
+  if (hours < 24) return `${hours} giờ trước`;
+  if (days < 7) return `${days} ngày trước`;
   
   return date.toLocaleDateString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
     year: 'numeric',
-    month: 'short',
-    day: 'numeric',
     hour: '2-digit',
     minute: '2-digit'
   });
 }
 
-function truncateText(text, maxLength = 100) {
-  if (text.length <= maxLength) return text;
-  return text.substring(0, maxLength) + '...';
-}
-
-// Data Management
-let historyData = [];
-let filteredData = [];
-
-async function loadHistoryData() {
-  try {
-    showLoading(true);
-    const result = await chrome.storage.local.get(['analysis_history']);
-    historyData = result.analysis_history || [];
-    filteredData = [...historyData];
-    
-    updateStats();
-    renderHistoryList();
-    showLoading(false);
-    
-    if (historyData.length === 0) {
-      showEmptyState(true);
-    } else {
-      showEmptyState(false);
-    }
-    
-    showToast(`📋 Đã tải ${historyData.length} bản ghi lịch sử`, 'success');
-  } catch (error) {
-    console.error('Error loading history:', error);
-    showToast('❌ Lỗi khi tải lịch sử', 'error');
-    showLoading(false);
-  }
-}
-
-function updateStats() {
-  const total = historyData.length;
-  const highRisk = historyData.filter(item => (item.ai?.risk || 0) >= 8).length;
-  const safe = historyData.filter(item => (item.ai?.risk || 0) <= 2).length;
-  
-  const today = new Date().toDateString();
-  const todayCount = historyData.filter(item => 
-    new Date(item.time).toDateString() === today
-  ).length;
-  
-  $('#totalAnalyses').textContent = total;
-  $('#highRiskCount').textContent = highRisk;
-  $('#safeCount').textContent = safe;
-  $('#todayCount').textContent = todayCount;
-}
-
-function renderHistoryList() {
-  const historyList = $('#historyList');
-  
-  if (filteredData.length === 0) {
-    historyList.innerHTML = `
-      <div class="no-results">
-        <div class="no-results-icon">🔍</div>
-        <h3>Không tìm thấy kết quả</h3>
-        <p>Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm</p>
-      </div>
-    `;
-    return;
-  }
-  
-  historyList.innerHTML = filteredData.map((item, index) => {
-    const riskInfo = formatRiskLevel(item.ai?.risk || 0);
-    const formattedDate = formatDate(item.time);
+// Render single history item
+function renderHistoryItem(item, index) {
+  const risk = item.ai?.risk || 0;
+  const riskInfo = formatRiskLevel(risk);
+  const domain = new URL(item.url).hostname;
     const summary = item.ai?.summary || 'Không có tóm tắt';
-    const url = item.url || 'Không có URL';
     const findings = item.ai?.findings || [];
-    const evidenceText = item.ai?.evidence_text || '';
     
     return `
-      <div class="history-item" data-index="${index}">
-        <div class="history-item-header">
-          <div class="history-item-title">
-            <span class="risk-badge ${riskInfo.class}">
-              ${riskInfo.icon} ${item.ai?.risk || 0}/10
-            </span>
-            <span class="history-item-url">${url}</span>
-          </div>
-          <div class="history-item-actions">
-            <button class="action-btn view-btn" title="Xem chi tiết">
-              <span class="btn-icon">👁️</span>
-            </button>
-            <button class="action-btn copy-btn" title="Copy báo cáo">
-              <span class="btn-icon">📋</span>
-            </button>
-            <button class="action-btn delete-btn" title="Xóa">
-              <span class="btn-icon">🗑️</span>
-            </button>
-          </div>
+    <div class="history-item hover-lift" data-index="${index}">
+      <div class="history-header">
+        <div class="history-meta">
+          <div class="history-domain">${domain}</div>
+          <div class="history-time">${formatDate(item.time)}</div>
         </div>
-        <div class="history-item-content">
-          <p class="history-item-summary"><strong>Tóm tắt:</strong> ${summary}</p>
-          ${findings.length > 0 ? `
-            <div class="history-item-findings">
-              <strong>Dấu hiệu phát hiện (${findings.length}):</strong>
-              <ul>
-                ${findings.slice(0, 5).map(finding => `<li>${finding}</li>`).join('')}
-                ${findings.length > 5 ? `<li><em>... và ${findings.length - 5} dấu hiệu khác</em></li>` : ''}
-              </ul>
-            </div>
-          ` : ''}
-          ${evidenceText ? `
-            <div class="history-item-evidence">
-              <strong>Bằng chứng:</strong>
-              <p>${evidenceText.length > 300 ? evidenceText.substring(0, 300) + '...' : evidenceText}</p>
-            </div>
-          ` : ''}
-          <div class="history-item-meta">
-            <span class="meta-item">
-              <span class="meta-icon">📅</span>
-              ${formattedDate}
-            </span>
-            <span class="meta-item">
-              <span class="meta-icon">🔗</span>
-              ${item.uploads?.annotated?.link ? 'Có ảnh' : 'Không có ảnh'}
-            </span>
-            <span class="meta-item">
-              <span class="meta-icon">📊</span>
-              ${findings.length} dấu hiệu
-            </span>
-          </div>
+        <div class="history-risk" style="color: ${riskInfo.color}">
+          <span class="risk-icon">${riskInfo.icon}</span>
+          <span class="risk-score">${risk}/10</span>
+          <span class="risk-label">${riskInfo.text}</span>
         </div>
       </div>
-    `;
-  }).join('');
-  
-  // Add event listeners to action buttons
-  addHistoryItemListeners();
-}
-
-function addHistoryItemListeners() {
-  // View details
-  $$('.view-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      const index = parseInt(e.target.closest('.history-item').dataset.index);
-      const item = filteredData[index];
-      showHistoryDetails(item);
-    });
-  });
-  
-  // Copy report
-  $$('.copy-btn').forEach(btn => {
-    btn.addEventListener('click', async (e) => {
-      const index = parseInt(e.target.closest('.history-item').dataset.index);
-      const item = filteredData[index];
-      await copyReport(item);
-    });
-  });
-  
-  // Delete item
-  $$('.delete-btn').forEach(btn => {
-    btn.addEventListener('click', async (e) => {
-      const index = parseInt(e.target.closest('.history-item').dataset.index);
-      const item = filteredData[index];
-      await deleteHistoryItem(item, index);
-    });
-  });
-}
-
-function showHistoryDetails(item) {
-  const riskInfo = formatRiskLevel(item.ai?.risk || 0);
-  const formattedDate = new Date(item.time).toLocaleString('vi-VN');
-  
-  const detailsHTML = `
-    <div class="history-details">
-      <div class="details-header">
-        <h3>Chi tiết phân tích</h3>
-        <button class="close-btn" id="closeDetails">✕</button>
-      </div>
-      <div class="details-content">
-        <div class="detail-section">
-          <h4>📊 Thông tin cơ bản</h4>
-          <div class="detail-grid">
-            <div class="detail-item">
-              <label>URL:</label>
-              <span>${item.url || 'Không có'}</span>
-            </div>
-            <div class="detail-item">
-              <label>Thời gian:</label>
-              <span>${formattedDate}</span>
-            </div>
-            <div class="detail-item">
-              <label>Mức rủi ro:</label>
-              <span class="risk-badge ${riskInfo.class}">
-                ${riskInfo.icon} ${item.ai?.risk || 0}/10 - ${riskInfo.text}
-              </span>
-            </div>
+      
+      <div class="history-content">
+        <div class="history-url">
+          <a href="${item.url}" target="_blank" title="Mở trang web">
+            <span class="url-icon">🔗</span>
+            ${item.url}
+          </a>
+        </div>
+        
+        <div class="history-summary">${summary}</div>
+        
+        ${findings.length > 0 ? `
+          <div class="history-findings">
+            <div class="findings-header">🔍 Dấu hiệu phát hiện:</div>
+            <ul class="findings-list">
+              ${findings.slice(0, 3).map(finding => `<li>${finding}</li>`).join('')}
+              ${findings.length > 3 ? `<li class="more-findings">... và ${findings.length - 3} dấu hiệu khác</li>` : ''}
+            </ul>
+        </div>
+        ` : ''}
+        
+        ${item.uploads ? `
+          <div class="history-images">
+            ${item.uploads.currentView ? `<a href="${item.uploads.currentView}" target="_blank" class="image-link" title="Xem ảnh viewport">📷 Viewport</a>` : ''}
+            ${item.uploads.fullPage ? `<a href="${item.uploads.fullPage}" target="_blank" class="image-link" title="Xem ảnh toàn trang">📄 Toàn trang</a>` : ''}
+            ${item.uploads.annotated ? `<a href="${item.uploads.annotated}" target="_blank" class="image-link" title="Xem ảnh phân tích">🔍 Phân tích</a>` : ''}
           </div>
+        ` : ''}
         </div>
-        
-        <div class="detail-section">
-          <h4>📝 Tóm tắt</h4>
-          <p>${item.ai?.summary || 'Không có tóm tắt'}</p>
-        </div>
-        
-        <div class="detail-section">
-          <h4>🔍 Bằng chứng chi tiết</h4>
-          <p>${item.ai?.evidence_text || 'Không có bằng chứng'}</p>
-        </div>
-        
-        <div class="detail-section">
-          <h4>💡 Khuyến nghị</h4>
-          <p>${item.ai?.recommendation || 'Không có khuyến nghị'}</p>
-        </div>
-        
-        <div class="detail-section">
-          <h4>📤 Ảnh bằng chứng</h4>
-          <div class="image-links">
-            ${item.uploads?.currentView?.link ? 
-              `<a href="${item.uploads.currentView.link}" target="_blank" class="image-link">📸 Ảnh viewport</a>` : ''}
-            ${item.uploads?.fullPage?.link ? 
-              `<a href="${item.uploads.fullPage.link}" target="_blank" class="image-link">📸 Ảnh toàn trang</a>` : ''}
-            ${item.uploads?.annotated?.link ? 
-              `<a href="${item.uploads.annotated.link}" target="_blank" class="image-link">🎨 Ảnh chú thích</a>` : ''}
-          </div>
-        </div>
+      
+      <div class="history-actions">
+        <button class="action-btn copy-url" data-url="${item.url}" title="Copy URL">
+          📋 Copy URL
+        </button>
+        <button class="action-btn delete-item" data-index="${index}" title="Xóa mục này">
+          🗑️ Xóa
+        </button>
       </div>
     </div>
   `;
-  
-  // Create modal
-  const modal = document.createElement('div');
-  modal.className = 'modal';
-  modal.innerHTML = detailsHTML;
-  document.body.appendChild(modal);
-  
-  // Close modal
-  $('#closeDetails').addEventListener('click', () => {
-    document.body.removeChild(modal);
-  });
-  
-  // Close on outside click
-  modal.addEventListener('click', (e) => {
-    if (e.target === modal) {
-      document.body.removeChild(modal);
-    }
-  });
 }
 
-async function copyReport(item) {
-  try {
-    const reportText = item.reportText || JSON.stringify(item, null, 2);
-    await navigator.clipboard.writeText(reportText);
-    showToast('📋 Đã copy báo cáo vào clipboard', 'success');
-  } catch (error) {
-    showToast('❌ Lỗi khi copy báo cáo', 'error');
+// Render history list
+function renderHistory() {
+  if (filteredData.length === 0) {
+    historyList.innerHTML = '';
+    emptyState.hidden = false;
+    return;
   }
+  
+  emptyState.hidden = true;
+  historyList.innerHTML = filteredData.map((item, index) => renderHistoryItem(item, index)).join('');
+  
+  // Add event listeners
+  addHistoryEventListeners();
 }
 
-async function deleteHistoryItem(item, index) {
-  if (!confirm('Bạn có chắc muốn xóa bản ghi này?')) return;
+// Add event listeners to history items
+function addHistoryEventListeners() {
+  // Copy URL buttons
+  document.querySelectorAll('.copy-url').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const url = btn.dataset.url;
+      navigator.clipboard.writeText(url).then(() => {
+        showToast('URL đã được copy!', 'success');
+      }).catch(() => {
+        showToast('Không thể copy URL', 'error');
+      });
+    });
+  });
+  
+  // Delete buttons
+  document.querySelectorAll('.delete-item').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const index = parseInt(btn.dataset.index);
+      deleteHistoryItem(index);
+    });
+  });
+}
+
+// Delete single history item
+async function deleteHistoryItem(index) {
+  if (!confirm('Bạn có chắc muốn xóa mục này?')) return;
   
   try {
-    // Remove from original data
-    const originalIndex = historyData.findIndex(h => h.time === item.time && h.url === item.url);
-    if (originalIndex !== -1) {
-      historyData.splice(originalIndex, 1);
-    }
-    
-    // Remove from filtered data
-    filteredData.splice(index, 1);
-    
-    // Update storage
-    await chrome.storage.local.set({ analysisHistory: historyData });
-    
-    // Update UI
+    historyData.splice(index, 1);
+    await chrome.storage.local.set({ analysis_history: historyData });
+    showToast('Đã xóa mục thành công', 'success');
+    applyFilters();
     updateStats();
-    renderHistoryList();
-    
-    showToast('🗑️ Đã xóa bản ghi', 'success');
   } catch (error) {
-    showToast('❌ Lỗi khi xóa bản ghi', 'error');
+    console.error('Error deleting item:', error);
+    showToast('Lỗi khi xóa mục', 'error');
   }
 }
 
-// Filtering and Search
-function applyFilters() {
-  const riskFilter = $('#riskFilter').value;
-  const dateFilter = $('#dateFilter').value;
-  const searchTerm = $('#searchInput').value.toLowerCase();
+// Update statistics
+function updateStats() {
+  const total = historyData.length;
+  const highRisk = historyData.filter(item => (item.ai?.risk || 0) >= 6).length;
+  const safe = historyData.filter(item => (item.ai?.risk || 0) < 4).length;
   
-  filteredData = historyData.filter(item => {
-    const risk = item.ai?.risk || 0;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayItems = historyData.filter(item => {
     const itemDate = new Date(item.time);
-    const now = new Date();
+    itemDate.setHours(0, 0, 0, 0);
+    return itemDate.getTime() === today.getTime();
+  }).length;
+  
+  totalAnalyses.textContent = total;
+  highRiskCount.textContent = highRisk;
+  safeCount.textContent = safe;
+  todayCount.textContent = todayItems;
+}
+
+// Apply filters
+function applyFilters() {
+  let filtered = [...historyData];
     
     // Risk filter
-    if (riskFilter !== 'all') {
-      if (riskFilter === 'high' && risk < 8) return false;
-      if (riskFilter === 'medium' && (risk < 5 || risk >= 8)) return false;
-      if (riskFilter === 'low' && risk >= 5) return false;
+  const riskValue = riskFilter.value;
+  if (riskValue !== 'all') {
+    filtered = filtered.filter(item => {
+      const risk = item.ai?.risk || 0;
+      switch (riskValue) {
+        case 'high': return risk >= 8;
+        case 'medium': return risk >= 5 && risk < 8;
+        case 'low': return risk < 5;
+        default: return true;
+      }
+    });
     }
     
     // Date filter
-    if (dateFilter !== 'all') {
-      const diffTime = Math.abs(now - itemDate);
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  const dateValue = dateFilter.value;
+  if (dateValue !== 'all') {
+    const now = new Date();
+    filtered = filtered.filter(item => {
+      const itemDate = new Date(item.time);
+      const diffTime = now - itemDate;
+      const diffDays = diffTime / (1000 * 60 * 60 * 24);
       
-      if (dateFilter === 'today' && diffDays > 0) return false;
-      if (dateFilter === 'week' && diffDays > 7) return false;
-      if (dateFilter === 'month' && diffDays > 30) return false;
+      switch (dateValue) {
+        case 'today': return diffDays < 1;
+        case 'week': return diffDays < 7;
+        case 'month': return diffDays < 30;
+        default: return true;
+      }
+    });
     }
     
     // Search filter
-    if (searchTerm) {
-      const url = (item.url || '').toLowerCase();
-      const summary = (item.ai?.summary || '').toLowerCase();
-      const evidence = (item.ai?.evidence_text || '').toLowerCase();
-      
-      if (!url.includes(searchTerm) && 
-          !summary.includes(searchTerm) && 
-          !evidence.includes(searchTerm)) {
-        return false;
-      }
-    }
-    
-    return true;
-  });
+  const searchValue = searchInput.value.toLowerCase().trim();
+  if (searchValue) {
+    filtered = filtered.filter(item => {
+      return item.url.toLowerCase().includes(searchValue) ||
+             (item.ai?.summary || '').toLowerCase().includes(searchValue) ||
+             (item.ai?.findings || []).some(finding => 
+               finding.toLowerCase().includes(searchValue)
+             );
+    });
+  }
   
-  renderHistoryList();
+  filteredData = filtered;
+  renderHistory();
 }
 
-// Export and Clear functions
-async function exportAllData() {
+// Load history data
+async function loadHistory() {
+  try {
+    loadingState.hidden = false;
+    emptyState.hidden = true;
+    historyList.innerHTML = '';
+    
+    const result = await chrome.storage.local.get(['analysis_history']);
+    historyData = result.analysis_history || [];
+    
+    console.log('Loaded history:', historyData.length, 'items');
+    
+    // Sort by time (newest first)
+    historyData.sort((a, b) => new Date(b.time) - new Date(a.time));
+    
+    updateStats();
+    applyFilters();
+    
+    loadingState.hidden = true;
+  } catch (error) {
+    console.error('Error loading history:', error);
+    loadingState.hidden = true;
+    showToast('Lỗi khi tải lịch sử', 'error');
+  }
+}
+
+// Export all data
+function exportData() {
   try {
     const dataStr = JSON.stringify(historyData, null, 2);
     const dataBlob = new Blob([dataStr], { type: 'application/json' });
     const url = URL.createObjectURL(dataBlob);
     
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `chongluadao-history-${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `chongluadao-history-${new Date().toISOString().split('T')[0]}.json`;
+    link.click();
     
-    showToast('📤 Đã xuất dữ liệu thành công', 'success');
+    URL.revokeObjectURL(url);
+    showToast('Đã xuất dữ liệu thành công!', 'success');
   } catch (error) {
-    showToast('❌ Lỗi khi xuất dữ liệu', 'error');
+    console.error('Export error:', error);
+    showToast('Lỗi khi xuất dữ liệu', 'error');
   }
 }
 
+// Clear all data
 async function clearAllData() {
-  if (!confirm('Bạn có chắc muốn xóa TOÀN BỘ lịch sử phân tích? Hành động này không thể hoàn tác!')) {
+  if (!confirm('Bạn có chắc muốn xóa TẤT CẢ lịch sử? Hành động này không thể hoàn tác!')) {
     return;
   }
   
   try {
-    await chrome.storage.local.remove(['analysisHistory']);
+    await chrome.storage.local.set({ analysis_history: [] });
     historyData = [];
-    filteredData = [];
-    
     updateStats();
-    renderHistoryList();
-    showEmptyState(true);
-    
-    showToast('🗑️ Đã xóa toàn bộ lịch sử', 'success');
+    applyFilters();
+    showToast('Đã xóa tất cả lịch sử', 'success');
   } catch (error) {
-    showToast('❌ Lỗi khi xóa lịch sử', 'error');
+    console.error('Clear error:', error);
+    showToast('Lỗi khi xóa lịch sử', 'error');
   }
 }
 
-// UI State Management
-function showLoading(show) {
-  $('#loadingState').hidden = !show;
-}
-
-function showEmptyState(show) {
-  $('#emptyState').hidden = !show;
-}
-
-// Initialize
+// Event listeners
 document.addEventListener('DOMContentLoaded', () => {
-  
   // Load initial data
-  loadHistoryData();
+  loadHistory();
   
-  // Event listeners
-  $('#riskFilter').addEventListener('change', applyFilters);
-  $('#dateFilter').addEventListener('change', applyFilters);
-  $('#searchInput').addEventListener('input', debounce(applyFilters, 300));
+  // Filter events
+  riskFilter.addEventListener('change', applyFilters);
+  dateFilter.addEventListener('change', applyFilters);
+  searchInput.addEventListener('input', debounce(applyFilters, 300));
   
-  $('#exportAll').addEventListener('click', exportAllData);
-  $('#clearAll').addEventListener('click', clearAllData);
-  $('#refreshData').addEventListener('click', loadHistoryData);
-  
-  $('#goToPopup').addEventListener('click', () => {
-    window.close();
-  });
-  
-  // Keyboard shortcuts
-  document.addEventListener('keydown', (e) => {
-    if (e.ctrlKey || e.metaKey) {
-      switch (e.key) {
-        case 'f':
-          e.preventDefault();
-          $('#searchInput').focus();
-          break;
-        case 'r':
-          e.preventDefault();
-          loadHistoryData();
-          break;
-        case 'e':
-          e.preventDefault();
-          exportAllData();
-          break;
-      }
-    }
+  // Button events
+  exportAll.addEventListener('click', exportData);
+  clearAll.addEventListener('click', clearAllData);
+  refreshData.addEventListener('click', loadHistory);
+  goToPopup.addEventListener('click', () => {
+    chrome.tabs.create({ url: chrome.runtime.getURL('popup.html') });
   });
 });
 
