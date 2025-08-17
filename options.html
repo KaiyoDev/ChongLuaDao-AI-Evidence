@@ -20,14 +20,15 @@
   <div class="config-section">
     <h3>🤖 Cấu hình Google Gemini API</h3>
     <div class="form-group">
-      <label for="geminiApiKey">API Key *</label>
-      <input 
-        id="geminiApiKey" 
-        type="password" 
-        placeholder="AIza..." 
+      <label for="geminiApiKeys">API Keys * (Mỗi dòng 1 key)</label>
+      <textarea 
+        id="geminiApiKeys" 
+        rows="5" 
+        placeholder="AIzaSyB1234567890abcdefghijklmnopqrstuvwxyz&#10;AIzaSyC0987654321zyxwvutsrqponmlkjihgfedcba&#10;AIzaSyDabcdefghijklmnopqrstuvwxyz1234567890" 
         required
-      />
+      ></textarea>
       <small class="help-text">
+        Nhập nhiều API keys (khuyến nghị 3-5 keys) để tránh limit. Mỗi dòng 1 key.<br>
         Lấy API key tại: <a href="https://makersuite.google.com/app/apikey" target="_blank" rel="noopener">Google AI Studio</a>
       </small>
     </div>
