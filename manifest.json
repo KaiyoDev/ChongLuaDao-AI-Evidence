@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "ChongLuaDao AI Evidence",
   "description": "Phân tích chuyên sâu các trang lừa đảo, chợ đen (CCV, tiền bẩn), tạo bằng chứng chi tiết bằng AI.",
-  "version": "2.13.5",
+  "version": "2.15.0",
   "action": { "default_popup": "popup.html" },
   "options_page": "options.html",
   "permissions": ["activeTab", "scripting", "tabs", "storage"],
