@@ -54,14 +54,16 @@ function hideStatus() {
 async function loadConfig() {
   try {
     const config = await chrome.storage.sync.get([
-      'geminiApiKey',
+      'geminiApiKeys',
       'geminiModel',
       'geminiEndpointBase',
       'userEmail',
       'apiHeaders'
     ]);
 
-    $('#geminiApiKey').value = config.geminiApiKey || '';
+    // Convert array to textarea format
+    const apiKeys = config.geminiApiKeys || [];
+    $('#geminiApiKeys').value = apiKeys.join('\n');
     $('#geminiModel').value = config.geminiModel || 'gemini-1.5-pro';
     $('#geminiEndpointBase').value = config.geminiEndpointBase || '';
     $('#userEmail').value = config.userEmail || '';
@@ -77,8 +79,14 @@ async function loadConfig() {
 // Save configuration
 async function saveConfig() {
   try {
+    // Parse API keys from textarea
+    const apiKeysText = $('#geminiApiKeys').value.trim();
+    const apiKeys = apiKeysText.split('\n')
+      .map(key => key.trim())
+      .filter(key => key.length > 0);
+
     const config = {
-      geminiApiKey: $('#geminiApiKey').value.trim(),
+      geminiApiKeys: apiKeys,
       geminiModel: $('#geminiModel').value,
       geminiEndpointBase: $('#geminiEndpointBase').value.trim(),
       userEmail: $('#userEmail').value.trim(),
@@ -86,15 +94,16 @@ async function saveConfig() {
     };
 
     // Validate required fields
-    if (!config.geminiApiKey) {
-      showToast("❌ Gemini API Key là bắt buộc", "error");
-      $('#geminiApiKey').focus();
+    if (apiKeys.length === 0) {
+      showToast("❌ Vui lòng nhập ít nhất 1 Gemini API Key", "error");
+      $('#geminiApiKeys').focus();
       return;
     }
 
-    // Validate API key format
-    if (!config.geminiApiKey.startsWith('AIza')) {
-      showToast("⚠️ Gemini API Key không đúng định dạng (phải bắt đầu bằng 'AIza')", "warning");
+    // Validate API keys format
+    const invalidKeys = apiKeys.filter(key => !key.startsWith('AIza'));
+    if (invalidKeys.length > 0) {
+      showToast(`⚠️ ${invalidKeys.length} API Key không đúng định dạng (phải bắt đầu bằng 'AIza')`, "warning");
     }
 
 
@@ -127,18 +136,25 @@ async function saveConfig() {
 // Test API connection
 async function testAPI() {
   try {
-    const apiKey = $('#geminiApiKey').value.trim();
-    const model = $('#geminiModel').value;
-    const endpointBase = $('#geminiEndpointBase').value.trim() || 'https://generativelanguage.googleapis.com';
+    // Parse API keys from textarea
+    const apiKeysText = $('#geminiApiKeys').value.trim();
+    const apiKeys = apiKeysText.split('\n')
+      .map(key => key.trim())
+      .filter(key => key.length > 0);
 
-    if (!apiKey) {
-      showToast("❌ Vui lòng nhập API Key trước", "error");
-      $('#geminiApiKey').focus();
+    if (apiKeys.length === 0) {
+      showToast("❌ Vui lòng nhập ít nhất 1 API Key trước", "error");
+      $('#geminiApiKeys').focus();
       return;
     }
 
-    showToast("🧪 Đang test kết nối API...", "info");
+    const model = $('#geminiModel').value;
+    const endpointBase = $('#geminiEndpointBase').value.trim() || 'https://generativelanguage.googleapis.com';
 
+    showToast(`🧪 Đang test ${apiKeys.length} API keys...`, "info");
+
+    // Test first API key
+    const apiKey = apiKeys[0];
     const testPrompt = "Hãy trả lời ngắn gọn: 'Test thành công'";
     const url = `${endpointBase}/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
@@ -164,7 +180,7 @@ async function testAPI() {
     const data = await response.json();
     
     if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
-      showToast("✅ Kết nối API thành công!", "success");
+      showToast(`✅ Test thành công! ${apiKeys.length} API keys đã sẵn sàng.`, "success");
     } else {
       throw new Error("Phản hồi API không đúng định dạng");
     }
@@ -186,19 +202,25 @@ async function testAPI() {
 
 // Form validation
 function validateForm() {
-  const apiKey = $('#geminiApiKey').value.trim();
+  // Parse API keys from textarea
+  const apiKeysText = $('#geminiApiKeys').value.trim();
+  const apiKeys = apiKeysText.split('\n')
+    .map(key => key.trim())
+    .filter(key => key.length > 0);
+
   const email = $('#userEmail').value.trim();
   const headers = $('#apiHeaders').value.trim();
 
-  // API Key validation
-  if (!apiKey) {
-    showToast("❌ API Key là bắt buộc", "error");
-    $('#geminiApiKey').focus();
+  // API Keys validation
+  if (apiKeys.length === 0) {
+    showToast("❌ Vui lòng nhập ít nhất 1 API Key", "error");
+    $('#geminiApiKeys').focus();
     return false;
   }
 
-  if (!apiKey.startsWith('AIza')) {
-    showToast("⚠️ API Key không đúng định dạng", "warning");
+  const invalidKeys = apiKeys.filter(key => !key.startsWith('AIza'));
+  if (invalidKeys.length > 0) {
+    showToast(`⚠️ ${invalidKeys.length} API Key không đúng định dạng`, "warning");
   }
 
   // Email validation
@@ -229,7 +251,7 @@ function isValidEmail(email) {
 
 // Auto-save on input change
 function setupAutoSave() {
-  const inputs = ['#geminiApiKey', '#geminiModel', '#geminiEndpointBase', '#userEmail', '#apiHeaders'];
+  const inputs = ['#geminiApiKeys', '#geminiModel', '#geminiEndpointBase', '#userEmail', '#apiHeaders'];
   
   inputs.forEach(selector => {
     const element = $(selector);
