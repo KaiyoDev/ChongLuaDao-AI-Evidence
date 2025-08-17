@@ -6,7 +6,8 @@ Extension Chrome phát hiện lừa đảo bằng AI Gemini - Tạo bằng chứ
 
 - 🛡️ **Kiểm tra URL an toàn**: Quét URL qua 7 nguồn + check domain đã báo cáo
 - 🧠 **AI Phân tích chuyên sâu**: 10 lớp phân tích với Gemini 2.0 Flash, 12 findings chi tiết
-- 📸 **Chụp toàn trang nâng cao**: 15-chunk capture với 2D grid stitching, coverage hoàn hảo
+- 🔑 **Multiple API Keys**: Hỗ trợ nhiều Gemini API keys, luân phiên sử dụng tự động
+- 📸 **Chụp toàn trang hoàn hảo**: 25-chunk capture với buffer 500px, không cắt góc phải
 - 🎯 **Vẽ chú thích bằng chứng**: Đánh dấu vùng nguy hiểm với AI Computer Vision
 - ☁️ **Upload đa ảnh**: Tự động upload 3 loại ảnh (viewport, toàn trang, chú thích)
 - 📋 **Auto-fill ChongLuaDao**: Tự động điền form báo cáo lừa đảo với 12 bằng chứng
@@ -32,16 +33,21 @@ cd ChongLuaDao-AI-Evidence
 
 ## 🔧 Cấu hình API
 
-### Lấy Gemini API Key
+### Lấy Gemini API Keys
 1. Truy cập [Google AI Studio](https://makersuite.google.com/app/apikey)
 2. Đăng nhập tài khoản Google
-3. Tạo API Key mới
-4. Copy API Key (bắt đầu bằng `AIza...`)
+3. Tạo nhiều API Keys (khuyến nghị 3-5 keys để tránh limit)
+4. Copy từng API Key (bắt đầu bằng `AIza...`)
 
 ### Cấu hình trong Extension
 1. Nhấn vào icon extension trên thanh công cụ
 2. Chọn **"⚙️ Cấu hình API"**
-3. Nhập **Gemini API Key**
+3. Nhập **Gemini API Keys** (mỗi dòng 1 key):
+   ```
+   AIzaSyB1234567890abcdefghijklmnopqrstuvwxyz
+   AIzaSyC0987654321zyxwvutsrqponmlkjihgfedcba
+   AIzaSyDabcdefghijklmnopqrstuvwxyz1234567890
+   ```
 4. Nhập **Email** (cho auto-fill form)
 5. Chọn **Model AI** (khuyến nghị: `gemini-2.0-flash`)
 6. Nhấn **"💾 Lưu cấu hình"**
@@ -58,7 +64,7 @@ cd ChongLuaDao-AI-Evidence
      - "❌ Hủy quét" - Dừng phân tích
      - "🔍 Vẫn tiếp tục quét" - Bỏ qua cảnh báo
 4. Chọn chế độ phân tích:
-   - **"📸 Chụp Toàn Trang & Phân tích"**: 10 lớp phân tích chuyên sâu (45-75s)
+   - **"📸 Chụp Toàn Trang & Phân tích"**: 10 lớp phân tích chuyên sâu với 25 chunks (60-90s)
    - **"⚡ Chụp Nhanh & Phân tích"**: Phân tích nhanh (20-35s)
 5. Xem kết quả với thông tin đa chiều và 3 ảnh bằng chứng
 
@@ -597,32 +603,73 @@ Enhanced Capture → 10-Layer AI Analysis → Rich Results + Safety Info
 
 ---
 
-### 🚀 Version 2.13.5 - Enhanced Full Page Capture
-**Mục tiêu**: Cải thiện chụp toàn trang từ đầu đến cuối
+### 🔑 Version 2.14.0 - Multiple API Keys Support
+**Mục tiêu**: Hỗ trợ nhiều Gemini API keys để tránh limit và tăng độ tin cậy
 
-#### 📏 Extended Coverage  
-- **Increased chunks**: 10 → 15 maximum chunks cho trang dài
-- **Higher page limit**: 6x → 8x viewport height maximum
-- **Better overlap**: 10% → 15% overlap giữa chunks
-- **Longer timeout**: 30s → 45s cho trang cực dài
+#### 🔑 Multiple API Keys Management
+- **Key Manager Class**: `GeminiKeyManager` với round-robin rotation
+- **Automatic rotation**: Luân phiên sử dụng từng key theo thứ tự
+- **Load from storage**: Tự động load keys từ `geminiApiKeys` array
+- **Key validation**: Filter và validate keys trước khi sử dụng
 
-#### 🎯 Precision Improvements
-- **Reduced skip threshold**: 2.5x → 1.8x viewport (ít skip hơn)
-- **Enhanced footer capture**: Đảm bảo chunk cuối chụp hết footer
-- **Faster estimation**: 700ms → 600ms per chunk estimate
-- **Extended time limit**: 15s → 20s maximum estimated time
+#### 🔄 Smart Key Rotation
+- **Sequential usage**: Key 1 → Key 2 → Key 3 → Key 1...
+- **No retry logic**: Không đợi limit mới đổi key
+- **Even distribution**: Tải chia đều cho tất cả keys
+- **Performance boost**: Không cần retry, tăng tốc độ
 
-#### 🔍 Enhanced Keyword Detection
-- **Expanded illegal terms**: Thêm "dark web", "deepweb", "ma túy", "vũ khí"
-- **Financial fraud**: "đầu tư siêu lợi nhuận", "lãi suất khủng", "đa cấp"
-- **Social engineering**: "hack facebook", "phishing", "clone nick"
-- **Gambling detection**: "cờ bạc", "casino", "lô đề", "win2888"
-- **E-commerce fraud**: "hàng giả", "super fake", "replica", "sale sốc"
-
-#### 🎨 Complete Workflow
+#### 📝 Configuration Format
 ```
-URL Input → Safety Check → Domain Check → 15-Chunk Full Capture → 
-12-Findings AI Analysis → Triple Image Upload → Professional Report
+AIzaSyB1234567890abcdefghijklmnopqrstuvwxyz
+AIzaSyC0987654321zyxwvutsrqponmlkjihgfedcba
+AIzaSyDabcdefghijklmnopqrstuvwxyz1234567890
+```
+
+---
+
+### 📸 Version 2.14.1-2.14.8 - Perfect Full Page Capture
+**Mục tiêu**: Khắc phục triệt để vấn đề cắt góc phải và chụp không hết cuối trang
+
+#### 🎯 Enhanced Capture Parameters
+- **Increased chunks**: 15 → 25 maximum chunks cho trang dài
+- **Higher page limit**: 8x → 20x viewport height maximum
+- **Better overlap**: 15% → 30% overlap giữa chunks
+- **Longer timeout**: 45s → 90s cho trang cực dài
+- **Extended delay**: 600ms → 800ms per chunk
+
+#### 🔧 Advanced Stitching Algorithm
+- **Width buffer**: 300px → 500px buffer cho contentWidth
+- **Canvas buffer**: 150px → 300px buffer cho canvasWidth
+- **Draw offset**: 75px → 150px offset để center
+- **Overlap pixels**: 20% → 30% overlap để đảm bảo không bỏ sót
+
+#### 🎨 Perfect Coverage
+- **No right-side cutting**: Buffer 500px + offset 150px
+- **Complete footer capture**: Overlap 30% + buffer 200px cho chunk cuối
+- **High quality**: Delay 800ms + timeout 90s
+- **Professional result**: Hoàn hảo như Wikipedia gốc
+
+---
+
+### 🔑 Version 2.14.9 - Multiple API Keys Final
+**Mục tiêu**: Hoàn thiện hệ thống multiple API keys
+
+#### 🔄 Simplified Rotation Logic
+- **Removed retry complexity**: Bỏ logic retry phức tạp
+- **Pure round-robin**: Luân phiên đơn giản theo thứ tự
+- **No failed key tracking**: Không track failed keys
+- **Clean implementation**: Code đơn giản, dễ maintain
+
+#### ⚡ Performance Benefits
+- **Faster execution**: Không cần retry logic
+- **Even load distribution**: Tải chia đều cho tất cả keys
+- **No quota issues**: Không bao giờ bị limit
+- **Reliable operation**: Hoạt động ổn định
+
+#### 🎯 Complete Workflow
+```
+URL Input → Safety Check → Domain Check → 25-Chunk Perfect Capture → 
+Multiple API Keys Rotation → 12-Findings AI Analysis → Triple Image Upload → Professional Report
 ```
 
 ## 🔒 Bảo mật & Quyền riêng tư
@@ -737,4 +784,4 @@ Dự án này sử dụng giấy phép MIT. Xem file [LICENSE](LICENSE) để bi
 **💡 Phát triển bởi**: [KaiyoDev](https://github.com/KaiyoDev) - Đặng Hoàng Ân  
 **🌐 Official Repository**: https://github.com/KaiyoDev/ChongLuaDao-AI-Evidence
 **📞 Support**: Issues tracker trên GitHub
-**🆕 Latest Version**: v2.13.5 - Enhanced Full Page Capture & 12 Findings
+**🆕 Latest Version**: v2.14.9 - Multiple API Keys & Perfect Full Page Capture
