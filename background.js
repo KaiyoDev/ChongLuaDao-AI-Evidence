@@ -3,7 +3,9 @@ console.log("Background script loaded");
 
 // ===== Helpers =====
 const API_UPLOAD = "https://chongluadao.vn/api/upload-image";
+// API endpoints
 const API_CHECK_URL = "https://kaiyobot.gis-humg.com/api/checkurl?url=";
+const API_CHECK_DOMAIN = "https://kaiyobot.gis-humg.com/api/checkmail?domain=";
 
 const nowIso = () => new Date().toISOString();
 const dataUrlToBase64 = (d) => d.split(",")[1];
@@ -39,6 +41,35 @@ async function checkUrlSafety(url) {
     };
   }
 }
+
+// Kiểm tra domain đã được báo cáo chưa
+async function checkDomainReported(url) {
+  try {
+    const domain = new URL(url).hostname;
+    console.log(`Checking domain reported: ${domain}`);
+    
+    const response = await fetch(`${API_CHECK_DOMAIN}${encodeURIComponent(domain)}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
+      console.warn(`Domain check failed with status: ${response.status}`);
+      return { success: false, reported: false, message: "Không thể kiểm tra domain" };
+    }
+    
+    const data = await response.json();
+    console.log('Domain report result:', data);
+    return data;
+  } catch (error) {
+    console.error('Error checking domain report:', error);
+    return { success: false, reported: false, message: "Lỗi khi kiểm tra domain" };
+  }
+}
+
+
 
 // Nén ảnh thông minh để tránh lỗi 413 (Payload Too Large)
 async function compressImage(dataUrl, maxWidth = 1200, quality = 0.7) {
@@ -112,14 +143,14 @@ function generateShortEvidence(aiData, reportUrl) {
   // Thêm URL và thời gian
   evidenceText += `\nURL ĐƯỢC PHÂN TÍCH: ${reportUrl}`;
   evidenceText += `\nTHỜI GIAN PHÂN TÍCH: ${new Date().toLocaleString('vi-VN')}`;
-  evidenceText += `\n\nPhân tích bởi: ChongLuaDao AI Evidence Extension v2.9.0`;
+  evidenceText += `\n\nPhân tích bởi: ChongLuaDao AI Evidence Extension v2.11.0`;
   
   return evidenceText;
 }
 
 // Tạo báo cáo văn bản chi tiết từ AI analysis
 function generateReportText(aiData, uploadUrls) {
-  const { url, capturedAt, urlSafetyData } = aiData;
+  const { url, capturedAt, urlSafetyData, domainReportData } = aiData;
   const risk = aiData.risk || 0;
   const findings = aiData.findings || [];
   const summary = aiData.summary || "Đang phân tích...";
@@ -195,9 +226,18 @@ ${recommendation}
     report += `• **Ảnh phân tích:** ${uploadUrls.annotated}\n`;
   }
 
+  // Thêm thông tin domain report nếu có
+  if (domainReportData?.success && domainReportData.reported) {
+    report += `\n\n## 🚨 CẢNH BÁO DOMAIN ĐÃ BÁO CÁO
+📋 **Domain:** ${domainReportData.domain}
+⚠️ **Trạng thái:** ${domainReportData.reported ? 'Đã được báo cáo trong tháng này' : 'Chưa có báo cáo'}
+📅 **Thời gian kiểm tra:** ${new Date(domainReportData.timestamp).toLocaleString('vi-VN')}
+💬 **Ghi chú:** ${domainReportData.message || 'Domain này đã từng được người dùng khác báo cáo'}`;
+  }
+
   report += `
 ---
-**🤖 Phân tích bởi:** ChongLuaDao AI Evidence Extension v2.9.0
+**🤖 Phân tích bởi:** ChongLuaDao AI Evidence Extension v2.11.0
 **⏱️ Thời gian tạo báo cáo:** ${new Date().toLocaleString('vi-VN')}
 `;
 
@@ -498,9 +538,19 @@ function analyzeSuspiciousFeatures(findings, evidenceText) {
     features.push("Có các chức năng nạp tiền và thanh toán trực tuyến thiếu minh bạch");
   }
   
-  // CHUYÊN BIỆT: Phát hiện các hoạt động phi pháp được công khai
+  // CHUYÊN BIỆT: Phát hiện các hoạt động vi phạm pháp luật nghiêm trọng
   if (allText.match(/(bán.*ccv|mua.*thẻ.*cắp|hack.*account|stolen.*data|dump.*card)/)) {
-    features.push("Công khai bán các sản phẩm/dịch vụ bất hợp pháp như CCV, thẻ cắp, tài khoản hack");
+    features.push("VI PHẠM PHÁP LUẬT NGHIÊM TRỌNG: Công khai bán các sản phẩm/dịch vụ bất hợp pháp như CCV, thẻ cắp, tài khoản hack");
+  }
+  
+  // VI PHẠM PHÁP LUẬT: Buôn bán tài khoản game/mạng xã hội
+  if (allText.match(/(bán.*tài.*khoản|acc.*game|account.*game|nick.*game|bán.*acc|mua.*acc|tài.*khoản.*facebook|tài.*khoản.*instagram|tài.*khoản.*tiktok)/)) {
+    features.push("VI PHẠM PHÁP LUẬT: Buôn bán tài khoản game/mạng xã hội - vi phạm điều khoản dịch vụ và có thể vi phạm luật sở hữu trí tuệ");
+  }
+  
+  // VI PHẠM BẢO MẬT: Thu thập thông tin cá nhân trái phép
+  if (allText.match(/(số.*điện.*thoại|phone.*number|địa.*chỉ.*nhà|home.*address|cccd|cmnd|passport|căn.*cước)/)) {
+    features.push("VI PHẠM BẢO MẬT: Yêu cầu cung cấp thông tin cá nhân nhạy cảm có thể dẫn đến rò rỉ dữ liệu và lạm dụng");
   }
   
   // CHUYÊN BIỆT: Phát hiện việc ẩn thông tin chủ sở hữu
@@ -826,36 +876,46 @@ async function captureWithRetry(maxRetries = 3) {
   }
 }
 
-// Chụp toàn bộ trang web (full page screenshot) với tối ưu tốc độ
+// Chụp toàn bộ trang web (full page screenshot) với fix cắt bên phải
 async function captureFullPage(tabId) {
   const startTime = Date.now();
   
   try {
-    // Lấy kích thước thực của trang với timeout và tính toán chính xác hơn
+    // Ẩn extension UI và đo kích thước chính xác
     const dimensionsPromise = chrome.scripting.executeScript({
       target: { tabId },
       func: () => {
+        // Ẩn tất cả extension elements để tránh che
+        const extensionElements = document.querySelectorAll('[data-extension], [id*="extension"], [class*="extension"]');
+        const hiddenElements = [];
+        extensionElements.forEach(el => {
+          if (el.style.display !== 'none') {
+            hiddenElements.push({element: el, originalDisplay: el.style.display});
+            el.style.display = 'none';
+          }
+        });
+        
         // Scroll lên đầu trang để đo chính xác
         const originalScrollX = window.scrollX;
         const originalScrollY = window.scrollY;
         window.scrollTo(0, 0);
         
-        // Đo kích thước với nhiều phương pháp
+        // Đo kích thước thực tế với padding
         const body = document.body;
         const html = document.documentElement;
         
-        // Lấy kích thước content thực tế
+        // Lấy kích thước content thực tế với buffer
         const contentHeight = Math.max(
           body.scrollHeight,
           body.offsetHeight,
           html.clientHeight,
           html.scrollHeight,
           html.offsetHeight,
-          // Thêm các phương pháp khác
           body.getBoundingClientRect().height,
           html.getBoundingClientRect().height
         );
         
+        // Thêm buffer cho width để tránh bị cắt
         const contentWidth = Math.max(
           body.scrollWidth,
           body.offsetWidth,
@@ -863,14 +923,17 @@ async function captureFullPage(tabId) {
           html.scrollWidth,
           html.offsetWidth,
           body.getBoundingClientRect().width,
-          html.getBoundingClientRect().width
+          html.getBoundingClientRect().width,
+          window.innerWidth + 50 // Thêm 50px buffer
         );
         
-        // Kiểm tra có sticky/fixed elements che khuất không
         const viewportHeight = window.innerHeight;
-        const viewportWidth = window.innerWidth;
+        const viewportWidth = Math.min(window.innerWidth, contentWidth);
         
-        // Test scroll xuống cuối để xác nhận chiều cao
+        // Test scroll để đảm bảo không có nội dung ẩn
+        window.scrollTo(contentWidth - viewportWidth, 0);
+        const maxScrollX = window.scrollX;
+        
         window.scrollTo(0, contentHeight);
         const maxScrollY = window.scrollY;
         const actualHeight = maxScrollY + viewportHeight;
@@ -878,16 +941,23 @@ async function captureFullPage(tabId) {
         // Khôi phục vị trí ban đầu
         window.scrollTo(originalScrollX, originalScrollY);
         
+        // Khôi phục extension elements
+        hiddenElements.forEach(({element, originalDisplay}) => {
+          element.style.display = originalDisplay;
+        });
+        
         return {
           width: contentWidth,
           height: Math.max(contentHeight, actualHeight),
           contentHeight: contentHeight,
           actualHeight: actualHeight,
           maxScrollY: maxScrollY,
+          maxScrollX: maxScrollX,
           viewportHeight: viewportHeight,
           viewportWidth: viewportWidth,
           originalScrollX: originalScrollX,
-          originalScrollY: originalScrollY
+          originalScrollY: originalScrollY,
+          hasHorizontalScroll: maxScrollX > 0
         };
       }
     });
@@ -898,130 +968,152 @@ async function captureFullPage(tabId) {
     );
 
     const [{ result: dimensions }] = await Promise.race([dimensionsPromise, timeoutPromise]);
-    const { width, height, viewportHeight, viewportWidth, originalScrollX, originalScrollY, contentHeight, actualHeight, maxScrollY } = dimensions;
+    const { width, height, viewportHeight, viewportWidth, originalScrollX, originalScrollY, 
+            contentHeight, actualHeight, maxScrollY, maxScrollX, hasHorizontalScroll } = dimensions;
     
-    console.log(`Page dimensions: ${width}x${height} (content: ${contentHeight}, actual: ${actualHeight}, maxScroll: ${maxScrollY}), viewport: ${viewportWidth}x${viewportHeight}`);
+    console.log(`Page dimensions: ${width}x${height} (content: ${contentHeight}, viewport: ${viewportWidth}x${viewportHeight}, horizontalScroll: ${hasHorizontalScroll})`);
     
     // Logic thông minh để quyết định có nên full capture hay không
-    const maxReasonableHeight = viewportHeight * 6; // Giảm xuống 6 viewport để an toàn
-    const estimatedTime = Math.ceil(height / viewportHeight) * 700; // Ước tính 700ms/chunk (bao gồm delay)
+    const maxReasonableHeight = viewportHeight * 8; // Tăng từ 6 lên 8 để capture trang dài hơn
+    const estimatedTime = Math.ceil(height / viewportHeight) * 600; // Giảm thời gian ước tính
     
     // Fallback về capture thường nếu:
-    if (height <= viewportHeight * 2.5 ||           // Trang ngắn
-        height > maxReasonableHeight ||             // Trang quá dài
-        estimatedTime > 15000) {                    // Ước tính > 15 giây
+    if (height <= viewportHeight * 1.8 ||           // Trang ngắn (giảm từ 2.5 xuống 1.8)
+        height > maxReasonableHeight ||             // Trang quá dài  
+        estimatedTime > 20000) {                    // Ước tính > 20 giây
       
       console.log(`Using quick capture: height=${height}, estimated_time=${estimatedTime}ms`);
+      
+      // Nếu có horizontal scroll, thử capture với scroll về 0,0 trước
+      if (hasHorizontalScroll) {
+        await chrome.scripting.executeScript({
+          target: { tabId },
+          func: () => window.scrollTo(0, 0)
+        });
+        await new Promise(resolve => setTimeout(resolve, 300));
+      }
+      
       return await captureVisible();
     }
 
-    // Tính số lần cần scroll với giới hạn chặt chẽ hơn
-    const maxChunks = 10; // Giảm xuống 10 chunks để tránh quota
-    const chunks = Math.min(Math.ceil(height / viewportHeight), maxChunks);
+    // Tăng số lần scroll để capture đầy đủ hơn
+    const maxChunks = 15; // Tăng từ 10 lên 15 để chụp đầy đủ hơn
+    const verticalChunks = Math.min(Math.ceil(height / viewportHeight), maxChunks);
+    const horizontalChunks = hasHorizontalScroll ? 2 : 1; // Nếu có horizontal scroll thì chụp 2 cột
     const screenshots = [];
 
-    console.log(`Starting full page capture: ${chunks} chunks`);
+    console.log(`Starting full page capture: ${verticalChunks} vertical × ${horizontalChunks} horizontal chunks`);
 
-    // Thông báo cho người dùng về thời gian ước tính
-    const estimatedMinutes = Math.ceil(estimatedTime / 60000);
-    if (estimatedMinutes > 0) {
-      chrome.tabs.sendMessage(tabId, { 
-        type: "STATUS_UPDATE", 
-        message: `📸 Đang chụp ${chunks} phần (ước tính ~${estimatedMinutes} phút)...` 
-      }).catch(() => {});
-    }
+      // Bỏ thông báo progress - chụp im lặng
 
-    // Scroll và chụp từng phần với overlap để tránh bị cắt
-    for (let i = 0; i < chunks; i++) {
-      const chunkStart = Date.now();
-      
-      // Tính toán vị trí scroll với overlap 10% để tránh bị cắt
-      let scrollY;
-      if (i === 0) {
-        scrollY = 0; // Chunk đầu tiên luôn từ đầu trang
-      } else if (i === chunks - 1) {
-        // Chunk cuối cùng - đảm bảo chụp đến cuối trang
-        scrollY = Math.max(0, height - viewportHeight);
-      } else {
-        // Các chunk giữa - có overlap 10% với chunk trước
-        const overlapPixels = Math.floor(viewportHeight * 0.1);
-        scrollY = (i * viewportHeight) - overlapPixels;
-      }
-      
-      // Scroll đến vị trí với smooth scrolling để chính xác hơn
-      await chrome.scripting.executeScript({
-        target: { tabId },
-        func: (y) => {
-          window.scrollTo({
-            top: y,
-            left: 0,
-            behavior: 'instant'
-          });
-          
-          // Đảm bảo scroll chính xác
-          const actualY = window.scrollY;
-          if (Math.abs(actualY - y) > 5) {
-            // Nếu không scroll đúng, thử lại
-            window.scrollTo(0, y);
-          }
-        },
-        args: [scrollY]
-      });
-
-      // Delay để trang ổn định và tuân thủ rate limit
-      const minDelayBetweenCaptures = 700; // Tăng delay để trang ổn định hơn
-      await new Promise(resolve => setTimeout(resolve, minDelayBetweenCaptures));
-
-      try {
-        // Lấy vị trí scroll thực tế sau khi ổn định
-        const [{ result: actualScrollData }] = await chrome.scripting.executeScript({
-          target: { tabId },
-          func: () => ({
-            scrollY: window.scrollY,
-            scrollX: window.scrollX,
-            viewportHeight: window.innerHeight,
-            viewportWidth: window.innerWidth
-          })
-        });
-
-        // Chụp màn hình phần này với retry logic
-        const screenshot = await captureWithRetry(3);
-        screenshots.push({
-          dataUrl: screenshot,
-          scrollY: actualScrollData.scrollY, // Dùng vị trí thực tế
-          plannedScrollY: scrollY, // Vị trí dự định
-          chunkIndex: i,
-          actualViewport: {
-            width: actualScrollData.viewportWidth,
-            height: actualScrollData.viewportHeight
-          }
-        });
-
-        const chunkTime = Date.now() - chunkStart;
-        console.log(`Chunk ${i+1}/${chunks}: planned=${scrollY}, actual=${actualScrollData.scrollY}, time=${chunkTime}ms`);
+    // Scroll và chụp từng phần với overlap để tránh bị cắt (hỗ trợ cả horizontal)
+    for (let row = 0; row < verticalChunks; row++) {
+      for (let col = 0; col < horizontalChunks; col++) {
+        const chunkStart = Date.now();
+        const chunkIndex = row * horizontalChunks + col;
         
-        // Cập nhật tiến độ cho người dùng
-        chrome.tabs.sendMessage(tabId, { 
-          type: "STATUS_UPDATE", 
-          message: `📸 Đã chụp ${i+1}/${chunks} phần...` 
-        }).catch(() => {});
-        
-      } catch (error) {
-        console.error(`Failed to capture chunk ${i+1}:`, error);
-        
-        // Nếu fail quá nhiều chunk thì dừng và dùng những gì có
-        if (screenshots.length === 0 && i > 2) {
-          throw new Error("Too many capture failures, falling back to visible area");
+        // Tính toán vị trí scroll vertical với overlap tốt hơn
+        let scrollY;
+        if (row === 0) {
+          scrollY = 0;
+        } else if (row === verticalChunks - 1) {
+          // Chunk cuối: đảm bảo chụp hết footer
+          scrollY = Math.max(0, height - viewportHeight);
+        } else {
+          // Overlap 15% để đảm bảo không bỏ sót nội dung
+          const overlapPixels = Math.floor(viewportHeight * 0.15);
+          scrollY = (row * viewportHeight) - overlapPixels;
         }
         
-        // Tiếp tục với chunk tiếp theo
-        continue;
-      }
+        // Tính toán vị trí scroll horizontal
+        let scrollX = 0;
+        if (horizontalChunks > 1) {
+          if (col === 0) {
+            scrollX = 0;
+          } else {
+            // Scroll sang phải để chụp phần còn lại
+            scrollX = Math.min(maxScrollX, viewportWidth * 0.7); // Overlap 30%
+          }
+        }
+        
+        // Scroll đến vị trí chính xác
+        await chrome.scripting.executeScript({
+          target: { tabId },
+          func: (x, y) => {
+            // Ẩn extension elements trước khi chụp
+            const extensionElements = document.querySelectorAll('[data-extension], [id*="extension"], [class*="extension"]');
+            extensionElements.forEach(el => {
+              el.style.visibility = 'hidden';
+            });
+            
+            window.scrollTo({
+              top: y,
+              left: x,
+              behavior: 'instant'
+            });
+            
+            // Đảm bảo scroll chính xác
+            const actualY = window.scrollY;
+            const actualX = window.scrollX;
+            if (Math.abs(actualY - y) > 5 || Math.abs(actualX - x) > 5) {
+              window.scrollTo(x, y);
+            }
+          },
+          args: [scrollX, scrollY]
+        });
 
-      // Timeout check - nếu quá 25 giây thì dừng
-      if (Date.now() - startTime > 25000) {
-        console.warn("Full page capture timeout, using current chunks");
-        break;
+        // Delay để trang ổn định
+        const minDelayBetweenCaptures = 700;
+        await new Promise(resolve => setTimeout(resolve, minDelayBetweenCaptures));
+
+        try {
+          // Lấy vị trí scroll thực tế sau khi ổn định
+          const [{ result: actualScrollData }] = await chrome.scripting.executeScript({
+            target: { tabId },
+            func: () => ({
+              scrollY: window.scrollY,
+              scrollX: window.scrollX,
+              viewportHeight: window.innerHeight,
+              viewportWidth: window.innerWidth
+            })
+          });
+
+          // Chụp màn hình với retry
+          const screenshot = await captureWithRetry(3);
+          screenshots.push({
+            dataUrl: screenshot,
+            scrollY: actualScrollData.scrollY,
+            scrollX: actualScrollData.scrollX,
+            plannedScrollY: scrollY,
+            plannedScrollX: scrollX,
+            chunkIndex: chunkIndex,
+            row: row,
+            col: col,
+            actualViewport: {
+              width: actualScrollData.viewportWidth,
+              height: actualScrollData.viewportHeight
+            }
+          });
+
+          const chunkTime = Date.now() - chunkStart;
+          console.log(`Chunk [${row},${col}]: planned=(${scrollX},${scrollY}), actual=(${actualScrollData.scrollX},${actualScrollData.scrollY}), time=${chunkTime}ms`);
+          
+        } catch (error) {
+          console.error(`Failed to capture chunk [${row},${col}]:`, error);
+          
+          // Nếu fail quá nhiều chunk thì dừng
+          if (screenshots.length === 0 && chunkIndex > 2) {
+            throw new Error("Too many capture failures, falling back to visible area");
+          }
+          
+          continue;
+        }
+
+        // Timeout check - tăng lên 45 giây cho trang dài
+        if (Date.now() - startTime > 45000) {
+          console.warn("Full page capture timeout, using current chunks");
+          break;
+        }
       }
     }
 
@@ -1056,7 +1148,7 @@ async function captureFullPage(tabId) {
   }
 }
 
-// Ghép các screenshot thành một ảnh duy nhất với xử lý overlap
+// Ghép các screenshot thành một ảnh duy nhất với xử lý cả vertical và horizontal
 async function stitchScreenshots(screenshots, dimensions) {
   console.log(`Stitching ${screenshots.length} screenshots...`);
   
@@ -1064,94 +1156,108 @@ async function stitchScreenshots(screenshots, dimensions) {
     throw new Error("No screenshots to stitch");
   }
   
-  // Nếu chỉ có 1 screenshot, trả về luôn
   if (screenshots.length === 1) {
     return screenshots[0].dataUrl;
   }
   
-  const { width, height, viewportHeight, viewportWidth } = dimensions;
+  const { width, height, viewportHeight, viewportWidth, hasHorizontalScroll } = dimensions;
   
-  // Sắp xếp screenshots theo scrollY để đảm bảo thứ tự đúng
-  screenshots.sort((a, b) => a.scrollY - b.scrollY);
+  // Sắp xếp screenshots theo row, sau đó theo col
+  screenshots.sort((a, b) => {
+    if (a.row !== b.row) return a.row - b.row;
+    return a.col - b.col;
+  });
   
-  // Tính toán chiều cao thực tế của canvas
-  const lastScreenshot = screenshots[screenshots.length - 1];
-  const actualCanvasHeight = Math.max(
-    height,
-    lastScreenshot.scrollY + (lastScreenshot.actualViewport?.height || viewportHeight)
-  );
+  // Tính toán kích thước canvas
+  const maxRow = Math.max(...screenshots.map(s => s.row || 0));
+  const maxCol = Math.max(...screenshots.map(s => s.col || 0));
+  const actualCanvasHeight = Math.max(height, (maxRow + 1) * viewportHeight);
+  const actualCanvasWidth = hasHorizontalScroll ? Math.max(width, viewportWidth * 1.3) : viewportWidth;
   
-  // Tạo canvas với kích thước thực tế
-  const canvas = new OffscreenCanvas(viewportWidth, actualCanvasHeight);
+  // Tạo canvas
+  const canvas = new OffscreenCanvas(actualCanvasWidth, actualCanvasHeight);
   const ctx = canvas.getContext("2d");
   
   // Fill background trắng
   ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, viewportWidth, actualCanvasHeight);
+  ctx.fillRect(0, 0, actualCanvasWidth, actualCanvasHeight);
   
-  console.log(`Canvas size: ${viewportWidth}x${actualCanvasHeight}`);
+  console.log(`Canvas size: ${actualCanvasWidth}x${actualCanvasHeight}, screenshots arranged in ${maxRow + 1}x${maxCol + 1} grid`);
   
-  // Vẽ từng chunk lên canvas với xử lý overlap
+  // Vẽ từng chunk
   for (let i = 0; i < screenshots.length; i++) {
     const screenshot = screenshots[i];
-    const { dataUrl, scrollY, actualViewport } = screenshot;
+    const { dataUrl, scrollY, scrollX, row, col, actualViewport } = screenshot;
     
-    console.log(`Processing chunk ${i}: scrollY=${scrollY}`);
+    console.log(`Processing chunk [${row},${col}]: scroll=(${scrollX},${scrollY})`);
     
-    // Tạo image từ dataUrl
-    const response = await fetch(dataUrl);
-    const blob = await response.blob();
-    const imageBitmap = await createImageBitmap(blob);
-    
-    const chunkViewportHeight = actualViewport?.height || viewportHeight;
-    const chunkViewportWidth = actualViewport?.width || viewportWidth;
-    
-    // Tính toán vị trí vẽ và crop area
-    let drawY = scrollY;
-    let sourceY = 0;
-    let drawHeight = chunkViewportHeight;
-    
-    // Xử lý overlap với chunk trước đó
-    if (i > 0) {
-      const prevScreenshot = screenshots[i - 1];
-      const prevEndY = prevScreenshot.scrollY + (prevScreenshot.actualViewport?.height || viewportHeight);
+    try {
+      // Tạo image từ dataUrl
+      const response = await fetch(dataUrl);
+      const blob = await response.blob();
+      const imageBitmap = await createImageBitmap(blob);
       
-      if (scrollY < prevEndY) {
-        // Có overlap - cắt bỏ phần overlap ở đầu chunk hiện tại
-        const overlapHeight = prevEndY - scrollY;
-        sourceY = overlapHeight;
-        drawY = prevEndY;
-        drawHeight = chunkViewportHeight - overlapHeight;
-        
-        console.log(`Chunk ${i} overlap detected: ${overlapHeight}px, adjusting sourceY to ${sourceY}`);
+      const chunkViewportHeight = actualViewport?.height || viewportHeight;
+      const chunkViewportWidth = actualViewport?.width || viewportWidth;
+      
+      // Tính toán vị trí vẽ
+      let drawX = col * viewportWidth * 0.7; // Overlap 30% cho horizontal
+      let drawY = scrollY;
+      let sourceX = 0;
+      let sourceY = 0;
+      let drawWidth = chunkViewportWidth;
+      let drawHeight = chunkViewportHeight;
+      
+      // Xử lý overlap vertical
+      if (row > 0) {
+        const sameColPrevious = screenshots.find(s => s.col === col && s.row === row - 1);
+        if (sameColPrevious) {
+          const prevEndY = sameColPrevious.scrollY + chunkViewportHeight;
+          if (scrollY < prevEndY) {
+            const overlapHeight = prevEndY - scrollY;
+            sourceY = overlapHeight;
+            drawY = prevEndY;
+            drawHeight = chunkViewportHeight - overlapHeight;
+          }
+        }
       }
-    }
-    
-    // Xử lý chunk cuối cùng
-    if (i === screenshots.length - 1) {
+      
+      // Xử lý overlap horizontal  
+      if (col > 0) {
+        const sameRowPrevious = screenshots.find(s => s.row === row && s.col === col - 1);
+        if (sameRowPrevious) {
+          const overlapWidth = chunkViewportWidth * 0.3;
+          sourceX = overlapWidth;
+          drawWidth = chunkViewportWidth - overlapWidth;
+        }
+      }
+      
       // Đảm bảo không vẽ quá canvas
-      const remainingHeight = actualCanvasHeight - drawY;
-      if (drawHeight > remainingHeight) {
-        drawHeight = remainingHeight;
+      if (drawX + drawWidth > actualCanvasWidth) {
+        drawWidth = actualCanvasWidth - drawX;
       }
-    }
-    
-    // Vẽ lên canvas với crop
-    if (drawHeight > 0) {
-      ctx.drawImage(
-        imageBitmap,
-        0, sourceY, chunkViewportWidth, drawHeight,  // Source rectangle
-        0, drawY, viewportWidth, drawHeight          // Destination rectangle
-      );
+      if (drawY + drawHeight > actualCanvasHeight) {
+        drawHeight = actualCanvasHeight - drawY;
+      }
       
-      console.log(`Drew chunk ${i}: source(0,${sourceY},${chunkViewportWidth},${drawHeight}) -> dest(0,${drawY},${viewportWidth},${drawHeight})`);
+      // Vẽ lên canvas
+      if (drawWidth > 0 && drawHeight > 0) {
+        ctx.drawImage(
+          imageBitmap,
+          sourceX, sourceY, drawWidth, drawHeight,
+          drawX, drawY, drawWidth, drawHeight
+        );
+        
+        console.log(`Drew chunk [${row},${col}]: source(${sourceX},${sourceY},${drawWidth},${drawHeight}) -> dest(${drawX},${drawY},${drawWidth},${drawHeight})`);
+      }
+    } catch (error) {
+      console.error(`Failed to process chunk [${row},${col}]:`, error);
+      continue;
     }
   }
   
-  // Chuyển canvas thành dataUrl
+  // Convert canvas to dataUrl
   const outputBlob = await canvas.convertToBlob({ type: "image/jpeg", quality: 0.8 });
-  
-  // Convert blob to base64 dataUrl
   const arrayBuffer = await outputBlob.arrayBuffer();
   const bytes = new Uint8Array(arrayBuffer);
   let binary = '';
@@ -1160,7 +1266,7 @@ async function stitchScreenshots(screenshots, dimensions) {
   }
   const base64 = btoa(binary);
   
-  console.log(`Stitching completed: final size ${viewportWidth}x${actualCanvasHeight}`);
+  console.log(`Stitching completed: final size ${actualCanvasWidth}x${actualCanvasHeight}`);
   
   return `data:image/jpeg;base64,${base64}`;
 }
@@ -1170,8 +1276,18 @@ async function getPageContext(tabId) {
   const [{ result }] = await chrome.scripting.executeScript({
     target: { tabId },
     func: () => {
-      // Thu thập thông tin cơ bản
-      const html = document.documentElement.outerHTML.slice(0, 800000);
+      // Thu thập thông tin cơ bản (loại bỏ extension code)
+      let cleanHTML = document.documentElement.outerHTML
+        // Loại bỏ extension scripts và elements
+        .replace(/<script[^>]*data-extension[^>]*>[\s\S]*?<\/script>/gi, '')
+        .replace(/<div[^>]*data-extension[^>]*>[\s\S]*?<\/div>/gi, '')
+        .replace(/<style[^>]*data-extension[^>]*>[\s\S]*?<\/style>/gi, '')
+        .replace(/chrome-extension:\/\/[^\s"'<>]+/gi, '')
+        .replace(/moz-extension:\/\/[^\s"'<>]+/gi, '')
+        .replace(/<script[^>]*src="chrome-extension:\/\/[^"]*"[^>]*><\/script>/gi, '')
+        .replace(/<link[^>]*href="chrome-extension:\/\/[^"]*"[^>]*>/gi, '');
+      
+      const html = cleanHTML.slice(0, 800000);
       const text = (document.body?.innerText || "").slice(0, 8000);
       
       // Phân tích forms và inputs nhạy cảm
@@ -1226,15 +1342,39 @@ async function getPageContext(tabId) {
       
       // CHUYÊN BIỆT: Quét sâu các dấu hiệu chợ đen và hoạt động bất hợp pháp
       const suspiciousKeywords = [
-        // Từ khóa chợ đen
-        'chợ đen', 'tiền bẩn', 'ccv', 'rửa tiền', 'hack', 'stolen', 'dump', 
-        'cvv', 'fullz', 'bins', 'carding', 'fraud', 'scam', 'illegal',
-        'black market', 'underground', 'dirty money', 'money laundering',
+        // Từ khóa chợ đen và hoạt động phi pháp
+        'chợ đen', 'tiền bẩn', 'rửa tiền', 'hack', 'stolen', 'dump', 'lừa đảo',
+        'black market', 'underground', 'dirty money', 'money laundering', 'scam',
+        'dark web', 'deepweb', 'hàng cấm', 'ma túy', 'vũ khí', 'thuốc lắc',
+        
         // Từ khóa tài chính bất hợp pháp
+        'ccv', 'cvv', 'fullz', 'bins', 'carding', 'fraud', 'illegal',
         'fake id', 'ssn', 'credit card', 'bank account', 'paypal', 'western union',
-        // Từ khóa Việt Nam
+        'thẻ tín dụng giả', 'clone thẻ', 'đánh cắp thẻ', 'mua bán thẻ',
+        
+        // Từ khóa lừa đảo tài chính
+        'đầu tư siêu lợi nhuận', 'lãi suất khủng', 'thu nhập khủng', 
+        'đầu tư 1 ăn 10', 'bảo hiểm lợi nhuận', 'cam kết hoàn tiền',
+        'đa cấp', 'kiếm tiền nhanh', 'việc nhẹ lương cao',
+        
+        // Từ khóa lừa đảo mạng xã hội
+        'hack facebook', 'hack zalo', 'hack instagram', 'tool hack',
+        'phishing', 'giả mạo', 'clone nick', 'đánh cắp tài khoản',
+        'bán acc', 'mua bán tài khoản', 'share acc', 'acc vip',
+        
+        // Từ khóa ngân hàng và thanh toán đáng ngờ
         'tài khoản bank', 'thẻ visa', 'chuyển tiền', 'rút tiền', 'đổi tiền',
-        'mua bán tài khoản', 'bán acc', 'hack facebook', 'tool hack'
+        'ngân hàng ảo', 'ví điện tử ảo', 'tài khoản ngân hàng ảo',
+        'chuyển tiền ảo', 'rút tiền ảo', 'tiền ảo', 'tiền điện tử',
+        
+        // Từ khóa cờ bạc và cá cược
+        'cờ bạc', 'casino', 'cá cược', 'đánh bài', 'poker', 'slot',
+        'lô đề', 'số đề', 'cá độ', 'đặt cược', 'win2888', 'rikvip',
+        
+        // Từ khóa lừa đảo thương mại điện tử
+        'hàng giả', 'hàng nhái', 'hàng fake', 'super fake', 'replica',
+        'giá rẻ bất ngờ', 'sale sốc', 'giảm sốc', 'thanh lý gấp',
+        'xả kho', 'giá gốc', 'giá tận xưởng'
       ];
       
       const pageContent = document.body.innerText.toLowerCase();
@@ -1467,8 +1607,8 @@ async function annotateWithAI(dataUrl, report) {
     ctx.fillText(`Bằng chứng: ${report.evidence_text.slice(0,90)}`, pad+14, pad+130);
   }
 
-  // 3 phát hiện đầu
-  const findings = (report.findings || []).slice(0, 3);
+  // 5 phát hiện đầu cho ảnh
+  const findings = (report.findings || []).slice(0, 5);
   let y = pad+154;
   for (const f of findings) {
     const s = `• ${f}`;
@@ -1514,7 +1654,7 @@ async function annotateWithAI(dataUrl, report) {
   return btoa(binary);
 }
 
-// Lưu lịch sử (tối đa 300 entries)
+// Lưu lịch sử (tối đa 50 entries để tránh quota)
 async function pushHistory(entry) {
   const KEY = "analysis_history";
   console.log('📝 Pushing history entry:', {
@@ -1530,21 +1670,39 @@ async function pushHistory(entry) {
     
     // Add entry to beginning of array
     list.unshift(entry);
-    const trimmedList = list.slice(0, 300);
+    const trimmedList = list.slice(0, 50); // Giảm xuống 50 để tránh quota
     
     // Save back to storage
     await chrome.storage.local.set({ [KEY]: trimmedList });
     
     console.log('✅ History saved successfully, new length:', trimmedList.length);
     
-    // Verify save
-    const { [KEY]: verifyList = [] } = await chrome.storage.local.get([KEY]);
-    console.log('🔍 Verification - saved entries:', verifyList.length);
-    
     return true;
   } catch (error) {
     console.error('❌ Error saving history:', error);
-    throw error;
+    
+    // Nếu lỗi quota, thử xóa history cũ và retry
+    if (error.message?.includes('quota') || error.message?.includes('Quota')) {
+      console.log('🧹 Clearing old history due to quota, retrying...');
+      try {
+        const { [KEY]: list = [] } = await chrome.storage.local.get([KEY]);
+        const reducedList = list.slice(0, 20); // Chỉ giữ 20 entries mới nhất
+        await chrome.storage.local.set({ [KEY]: reducedList });
+        
+        // Retry save with reduced history
+        reducedList.unshift(entry);
+        const finalList = reducedList.slice(0, 20);
+        await chrome.storage.local.set({ [KEY]: finalList });
+        
+        console.log('✅ History saved after cleanup, length:', finalList.length);
+        return true;
+      } catch (retryError) {
+        console.error('❌ Failed to save even after cleanup:', retryError);
+        return false;
+      }
+    }
+    
+    return false;
   }
 }
 
@@ -1565,6 +1723,8 @@ ${details?.safe?.length > 0 ? `- Số nguồn xác nhận an toàn: ${details.sa
 QUAN TRỌNG: Hãy tích hợp thông tin này vào phân tích để đưa ra đánh giá chính xác hơn.
 `;
   }
+
+
 
   return `
 Bạn là chuyên gia an ninh mạng và phân tích lừa đảo web hàng đầu. Phân tích TOÀN DIỆN và CHUYÊN SÂU hình ảnh cùng nội dung trang web để đưa ra đánh giá RỦI RO chi tiết nhất.
@@ -1587,7 +1747,7 @@ TRẢ VỀ JSON DUY NHẤT theo schema:
 {
   "risk": <number 0-10>,
   "summary": <string: tóm tắt 2-3 câu chi tiết>,
-  "findings": [<mảng 10-15 dấu hiệu CỤ THỂ và CHI TIẾT bằng tiếng Việt>],
+  "findings": [<mảng 12 dấu hiệu CỤ THỂ và CHI TIẾT bằng tiếng Việt>],
   "evidence_text": <string: bằng chứng chi tiết 500-800 từ>,
   "technical_analysis": <string: phân tích kỹ thuật 300-450 từ>,
   "recommendation": <string: khuyến nghị cụ thể 150-200 từ>,
@@ -1597,13 +1757,16 @@ TRẢ VỀ JSON DUY NHẤT theo schema:
   "boxes": [{"x":num,"y":num,"w":num,"h":num,"label":str,"score":0-1}]
 }
 
-QUAN TRỌNG VỀ FINDINGS: 
+QUAN TRỌNG VỀ FINDINGS - PHẢI CÓ ĐÚNG 12 DẤU HIỆU: 
+BUỘC PHẢI TRẢ VỀ ĐÚNG 12 FINDINGS TRONG MẢNG, KHÔNG ĐƯỢC ÍT HỤT!
 Mỗi finding phải CỤ THỂ và CHI TIẾT, không được chung chung. Ví dụ:
 ❌ KHÔNG ĐƯỢC: "Trang web đáng ngờ"
 ❌ KHÔNG ĐƯỢC: "Có dấu hiệu lừa đảo"
 ✅ ĐƯỢC: "Trang web bán tài khoản game trực tuyến với nhiều dấu hiệu đáng ngờ"
 ✅ ĐƯỢC: "Sử dụng nhiều mã JavaScript phức tạp và bị làm rối (obfuscated)"
 ✅ ĐƯỢC: "Quảng cáo giá rẻ và khuyến mãi cao bất thường (giảm giá 90%)"
+
+LUÔN LUÔN TRẢ VỀ ĐÚNG 12 FINDINGS TRONG MẢNG JSON, NGAY CẢ KHI TRANG WEB AN TOÀN!
 
 TIÊU CHÍ CHẤM ĐIỂM RỦI RO (0-10):
 - 0-1: Trang web chính thống, có đầy đủ thông tin pháp lý
@@ -1637,7 +1800,6 @@ DẤU HIỆU LỪA ĐẢO NÂNG CAO (tìm kiếm kỹ lưỡng):
 - Lưu trữ thông tin không mã hóa
 
 🌐 KỸ THUẬT & DOMAIN:
-- Domain mới tạo (<6 tháng), tên miền lạ
 - Subdomain của dịch vụ miễn phí (blogspot, github.io)
 - Không có SSL/HTTPS hoặc cert không hợp lệ
 - Redirect qua nhiều domain trung gian
@@ -1669,7 +1831,7 @@ DẤU HIỆU LỪA ĐẢO NÂNG CAO (tìm kiếm kỹ lưỡng):
 - Bán CCV (Credit Card Verification), thông tin thẻ tín dụng cắp
 - Bán "dump card", thông tin thẻ từ đánh cắp
 - Bán tài khoản hack, stolen accounts, cracked accounts
-- Dịch vụ hack, phishing, scamming được công khai
+- Dịch vụ hack game mod game, hack account, hack game, hack tool, hack tool game, hack tool game mod, hack tool game mod game, hack tool game mod game mod, hack tool game mod game mod game, hack tool game mod game mod game mod, hack tool game mod game mod game mod game, hack tool game mod game mod game mod game mod, hack tool game mod game mod game mod game mod game, hack tool game mod game mod game mod game mod game mod, hack tool game mod game mod game mod game mod game mod, hack tool game mod game mod game mod game mod game mod game, hack tool game mod game mod game mod game mod game mod game mod, hack tool game mod game mod game mod game mod game mod game mod, hack tool game mod game mod game mod game mod game mod game mod game, hack tool game mod game mod game mod game mod game mod game mod game mod, hack tool game mod game mod game mod game mod game mod game mod game mod, hack tool game mod game mod game mod game mod game mod game mod game mod game, hack tool game mod game mod game mod game mod game mod game mod game mod game mod, hack tool game mod game mod game mod game mod game mod game mod game mod game mod game, hack tool game mod game mod game mod game mod game mod game mod game mod game mod game mod, hack tool game mod game mod game mod game mod game mod game mod game mod game mod game mod game, hack tool game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod, hack tool game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod, hack tool game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game, hack tool game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod, hack tool game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod, hack tool game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod, hack tool game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod, hack tool game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod, hack tool game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod, hack tool game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod, hack tool game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod, hack tool game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod, hack tool game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod, hack tool game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod, hack tool game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod, hack tool game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod, hack tool game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod, hack tool game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod, hack tool game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod, hack tool game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod, hack tool game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod, hack tool game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod, hack tool game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod, hack tool game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod, hack tool game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod, hack tool game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod, hack tool game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod, hack tool game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod, hack tool game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod, hack tool game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod, hack tool game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod, hack tool game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod, hack tool game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod, hack tool game mod game mod game mod game mod game mod game mod game mod game mod game mod game mod
 - Từ ngữ: "rửa tiền", "clean money", "money exchange illegal"
 - Bán database cá nhân, thông tin nhạy cảm bị rò rỉ
 - Các thuật ngữ hacker: "cvv", "fullz", "dumps", "bins"
@@ -1740,17 +1902,21 @@ ${Object.entries(context.meta_tags || {}).slice(0, 10).map(([key, value]) =>
 ).join('\n') || 'Không có meta tags'}
 
 📝 NỘI DUNG TEXT TRANG (${context.page_text?.length || 0} ký tự):
-${(context.page_text || "").slice(0, 6000)}
+${(context.page_text || "").slice(0, 2000)}
 
 💻 HTML SOURCE CODE (${context.html_snippet?.length || 0} ký tự):
-${(context.html_snippet || "").slice(0, 12000)}
+${(context.html_snippet || "").slice(0, 4000)}
 
-🎯 NHIỆM VỤ: 
+🎯 NHIỆM VỤ QUAN TRỌNG: 
 Đây là ảnh TOÀN BỘ TRANG WEB (full page screenshot), không phải chỉ viewport. Hãy phân tích từ đầu đến cuối trang:
+
+⚠️ LƯU Ý BẮT BUỘC: MẢNG "findings" PHẢI CÓ ĐÚNG 12 PHẦN TỬ!
+Nếu trang web an toàn, hãy tạo ra 12 điểm tích cực hoặc các đặc điểm kỹ thuật.
 - Quét toàn bộ chiều dài trang từ header đến footer
 - Chú ý các phần có thể ẩn dưới fold ban đầu
 - Phân tích layout tổng thể và user journey
 - Tìm các element đáng ngờ ở mọi vị trí trên trang
+- Phải tạo ra 12 lý do khác nhau để đánh giá rủi ro của trang web tránh quá chung chung mà cụ thể lên đến 12 dấu hiệu cụ thể
 
 Viết evidence_text như báo cáo chuyên gia (300+ từ) và technical_analysis chi tiết về cấu trúc trang. Recommendation phải cụ thể dựa trên full context của trang.`;
 }
@@ -1770,7 +1936,7 @@ async function callGemini({ apiKey, model, imageBase64, context, endpointBase, u
     }],
     generationConfig: {
       temperature: 0.1,
-      maxOutputTokens: 4000, // Tăng lên 4000 cho phân tích chuyên sâu hơn
+      maxOutputTokens: 6000, // Tăng lên 6000 cho phân tích 12 findings chi tiết
       responseMimeType: "application/json"
     }
   };
@@ -1829,27 +1995,45 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
         if (!geminiApiKey) throw new Error("Chưa cấu hình Gemini API Key trong Options.");
 
-        // 0) Kiểm tra an toàn URL trước khi quét (nếu không phải force scan)
+        // 0) Kiểm tra an toàn URL và domain đã báo cáo trước khi quét (nếu không phải force scan)
         let urlSafetyData = null;
+        let domainReportData = null;
         if (!msg.forceScan) {
-          chrome.tabs.sendMessage(tabId, { type: "STATUS_UPDATE", message: "🔍 Đang kiểm tra an toàn URL..." }).catch(() => {});
+          // Bỏ thông báo progress - chỉ im lặng quét
           
           const [currentTab] = await chrome.tabs.query({ active: true, currentWindow: true });
-          urlSafetyData = await checkUrlSafety(currentTab.url);
+          
+          // Kiểm tra URL safety và domain report song song
+          const [urlSafetyResult, domainReportResult] = await Promise.all([
+            checkUrlSafety(currentTab.url),
+            checkDomainReported(currentTab.url)
+          ]);
+          
+          urlSafetyData = urlSafetyResult;
+          domainReportData = domainReportResult;
           
           console.log('URL Safety Check Result:', urlSafetyData);
+          console.log('Domain Report Check Result:', domainReportData);
           
-          // Nếu URL nguy hiểm và người dùng chưa xác nhận tiếp tục
-          if (urlSafetyData?.success && urlSafetyData.data?.result === "unsafe") {
+          // Nếu URL nguy hiểm hoặc domain đã được báo cáo và người dùng chưa xác nhận tiếp tục
+          const isUnsafeUrl = urlSafetyData?.success && urlSafetyData.data?.result === "unsafe";
+          const isDomainReported = domainReportData?.success && domainReportData.reported;
+          
+          if (isUnsafeUrl || isDomainReported) {
             chrome.tabs.sendMessage(tabId, { 
               type: "URL_SAFETY_WARNING", 
-              data: urlSafetyData.data 
+              data: {
+                urlSafety: urlSafetyData?.data,
+                domainReport: domainReportData,
+                isUnsafeUrl,
+                isDomainReported
+              }
             }).catch(() => {});
             return; // Dừng quét để chờ người dùng xác nhận
           }
         }
 
-        // 1) Lấy context và chụp ảnh theo chế độ được chọn
+        // 1) Lấy context và chụp ảnh theo chế độ được chọn (im lặng)
         const ctx = await getPageContext(tabId);
         
         const captureMode = msg.captureMode || "FULL_PAGE";
@@ -1863,14 +2047,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           console.log("Using full page capture mode - dual screenshots");
           // Chụp viewport hiện tại trước
           currentViewDataUrl = await captureVisible();
-          // Sau đó chụp full page
+          // Sau đó chụp full page (im lặng)
           fullPageDataUrl = await captureFullPage(tabId);
         }
         
         const shotBase64 = dataUrlToBase64(fullPageDataUrl); // Dùng full page cho AI analysis
 
-        // 2) Gọi Gemini phân tích chuyên sâu
-        chrome.tabs.sendMessage(tabId, { type: "STATUS_UPDATE", message: "🤖 Đang phân tích chuyên sâu bằng AI..." }).catch(() => {});
+        // 2) Gọi Gemini phân tích chuyên sâu (im lặng)
         
         let aiReport = await callGemini({
           apiKey: geminiApiKey,
@@ -1886,9 +2069,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         aiReport.capturedAt = nowIso();
         aiReport.context = ctx; // Lưu context để sử dụng trong báo cáo
         aiReport.urlSafetyData = urlSafetyData; // Lưu kết quả kiểm tra an toàn URL
+        aiReport.domainReportData = domainReportData; // Lưu kết quả kiểm tra domain đã báo cáo
 
-        // 4) Upload ảnh viewport hiện tại
-        chrome.tabs.sendMessage(tabId, { type: "STATUS_UPDATE", message: "📤 Đang upload ảnh viewport..." }).catch(() => {});
+
+        // 4) Upload ảnh viewport hiện tại (im lặng)
         
         const compressedCurrentView = await compressImage(currentViewDataUrl, 1200, 0.8);
         const upCurrentView = await uploadImageJSON({
@@ -1897,8 +2081,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           headers: apiHeaders
         }).catch(e => ({ success: false, error: String(e) }));
 
-        // 5) Upload ảnh full page
-        chrome.tabs.sendMessage(tabId, { type: "STATUS_UPDATE", message: "📤 Đang upload ảnh full page..." }).catch(() => {});
+        // 5) Upload ảnh full page (im lặng)
         
         const compressedFullPage = await compressImage(fullPageDataUrl, 1200, 0.8);
         const upFullPage = await uploadImageJSON({
@@ -1907,12 +2090,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           headers: apiHeaders
         }).catch(e => ({ success: false, error: String(e) }));
 
-        // 6) Vẽ chú thích và upload ảnh có chú thích  
-        chrome.tabs.sendMessage(tabId, { type: "STATUS_UPDATE", message: "🎨 Đang tạo ảnh chú thích..." }).catch(() => {});
-        
+        // 6) Vẽ chú thích và upload ảnh có chú thích (im lặng)
         const annotatedB64 = await annotateWithAI(fullPageDataUrl, aiReport);
-        
-        chrome.tabs.sendMessage(tabId, { type: "STATUS_UPDATE", message: "📤 Đang upload ảnh chú thích..." }).catch(() => {});
         
         const upAnnotated = await uploadImageJSON({
           base64: annotatedB64,
@@ -1929,27 +2108,73 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         
         const reportText = generateReportText(aiReport, uploadUrls);
         
+        // Tối ưu report để giảm storage quota
         const report = {
           url: ctx.url,
           time: aiReport.capturedAt,
-          ai: aiReport,
-          uploads: { 
-            currentView: upCurrentView, 
-            fullPage: upFullPage, 
-            annotated: upAnnotated 
+          ai: {
+            risk: aiReport.risk,
+            summary: aiReport.summary,
+            findings: aiReport.findings?.slice(0, 12) || [], // Tăng lên 12 findings
+            website_category: aiReport.website_category,
+            threat_level: aiReport.threat_level,
+            confidence_score: aiReport.confidence_score
+            // Bỏ context, evidence_text, technical_analysis để tiết kiệm storage
           },
-          reportText: reportText
+          uploads: { 
+            currentView: upCurrentView?.success ? upCurrentView.link : null,
+            fullPage: upFullPage?.success ? upFullPage.link : null,
+            annotated: upAnnotated?.success ? upAnnotated.link : null
+          }
+          // Bỏ reportText để tiết kiệm storage
         };
 
-        // 7) Lưu vào lịch sử
+        // 7) Lưu vào lịch sử với error handling tốt hơn
         console.log('✅ Saving report to history...');
         try {
-          await pushHistory(report);
-          console.log('✅ Report saved to history successfully');
+          // Tạo object report compact để tránh quota
+          const compactReport = {
+            url: ctx.url,
+            time: aiReport.capturedAt,
+            ai: {
+              risk: aiReport.risk || 0,
+              summary: (aiReport.summary || "").slice(0, 200),
+              findings: (aiReport.findings || []).slice(0, 12),
+              website_category: aiReport.website_category,
+              threat_level: aiReport.threat_level
+            },
+            uploads: {
+              currentView: upCurrentView?.success ? upCurrentView.link : null,
+              fullPage: upFullPage?.success ? upFullPage.link : null,
+              annotated: upAnnotated?.success ? upAnnotated.link : null
+            }
+          };
+          
+          const historyResult = await pushHistory(compactReport);
+          if (historyResult) {
+            console.log('✅ Report saved to history successfully');
+          } else {
+            console.warn('⚠️ History save returned false, but continuing...');
+          }
         } catch (historyError) {
           console.error('❌ Error saving to history:', historyError);
-          // Continue anyway - don't fail the whole analysis
+          // Thử lưu với dữ liệu tối thiểu
+          try {
+            const minimalReport = {
+              url: ctx.url,
+              time: aiReport.capturedAt,
+              ai: { risk: aiReport.risk || 0, summary: "Phân tích hoàn tất" }
+            };
+            await pushHistory(minimalReport);
+            console.log('✅ Minimal report saved to history');
+          } catch (fallbackError) {
+            console.error('❌ Even minimal save failed:', fallbackError);
+          }
         }
+        
+
+        
+        // Bỏ thông báo lớn - chỉ quét im lặng
         
         console.log('📤 Sending response to popup...');
         sendResponse({ ok: true, report });
@@ -2166,14 +2391,25 @@ function detectCelebrityFraud(evidenceText, summary) {
     'sơn tùng', 'đen vâu', 'jack', 'k-icm', 'hieuthuhai',
     'thủy tiên', 'công vinh', 'việt hương', 'lê giang',
     'hồ ngọc hà', 'thanh hà', 'mỹ tâm', 'đông nhi', 'hari won',
-    'quang linh', 'khá bảnh', 'độ mixi', 'pewpew', 'xemesis'
+    'quang linh', 'khá bảnh', 'độ mixi', 'pewpew', 'xemesis',
+    'ngọc trinh', 'chi pu', 'sơn tùng mtp', 'đức phúc', 'erik',
+    'karik', 'binz', 'wowy', 'rhymastic', 'suboi',
+    'bích phương', 'min', 'tóc tiên', 'isaac', 'gil lê',
+    'trường giang', 'nhã phương', 'lan ngọc', 'ninh dương lan ngọc',
+    'ngô kiến huy', 'jun phạm', 'sam', 'trịnh thăng bình', 'lê dương bảo lâm',
+    'trường thế vinh', 'ngọc phước', 'duy khánh', 'huỳnh phương', 'thái vũ'
   ];
   
   // Từ khóa quảng cáo mạo danh
   const fraudKeywords = [
     'khuyên dùng', 'sử dụng', 'đầu tư', 'kiếm tiền', 'bí quyết',
-    'chia sẻ', 'tiết lộ', 'bật mí', 'gợi ý', 'khuyến nghị',
-    'chứng thực', 'xác nhận', 'cam kết', 'đảm bảo'
+    'chia sẻ', 'tiết lộ', 'bật mí', 'gợi ý', 'khuyến nghị', 
+    'chứng thực', 'xác nhận', 'cam kết', 'đảm bảo',
+    'thu nhập khủng', 'lợi nhuận cao', 'siêu lợi nhuận',
+    'bảo hiểm lợi nhuận', 'cam kết hoàn tiền', 'đa cấp',
+    'kiếm tiền nhanh', 'việc nhẹ lương cao', 'thu nhập ổn định',
+    'không cần vốn', 'không cần kinh nghiệm', 'ai cũng làm được',
+    'thành công 100%', 'bảo đảm thắng', 'không lo thua lỗ'
   ];
   
   for (const celebrity of celebrities) {
@@ -2187,7 +2423,7 @@ function detectCelebrityFraud(evidenceText, summary) {
   }
   
   // Phát hiện pattern chung về celebrity endorsement
-  if (allText.match(/(shark|người nổi tiếng|mc|ca sĩ|diễn viên|youtuber).*?(khuyên|dùng|đầu tư|kiếm tiền)/)) {
+  if (allText.match(/(shark|người nổi tiếng|mc|ca sĩ|diễn viên|youtuber|tiktoker|streamer|kol|idol).*?(khuyên|dùng|đầu tư|kiếm tiền|bảo đảm|cam kết|chia sẻ|tiết lộ)/)) {
     return "Mạo danh người nổi tiếng để tăng độ tin cậy và lừa đảo người dùng";
   }
   
@@ -2205,13 +2441,19 @@ function detectFakeSuccessStories(evidenceText, findings) {
     /thu.*?(\d+).*?(triệu|nghìn|k|tr)/,
     /lãi.*?(\d+).*?(triệu|nghìn|k|tr)/,
     /thành công.*?rút.*?(\d+)/,
-    /đã.*?nhận.*?(\d+).*?(triệu|nghìn)/
+    /đã.*?nhận.*?(\d+).*?(triệu|nghìn)/,
+    /nhận.*?(\d+).*?(triệu|nghìn|k|tr).*?(hôm nay|tuần này|tháng này)/,
+    /đầu tư.*?(\d+).*?(triệu|nghìn|k|tr).*?(lãi|lời)/,
+    /chốt.*?(\d+).*?(triệu|nghìn|k|tr).*?(lệnh|phiên)/
   ];
   
   const testimonialKeywords = [
     'chị mai', 'anh nam', 'chị hoa', 'anh tuấn', 'chị lan',
     'bà nga', 'cô linh', 'thầy minh', 'chú hùng', 'em trang',
-    'khách hàng', 'thành viên', 'user', 'trader', 'nhà đầu tư'
+    'khách hàng', 'thành viên', 'user', 'trader', 'nhà đầu tư',
+    'anh thắng', 'chị thảo', 'anh phong', 'chị ngọc', 'anh quân',
+    'chị hương', 'anh dũng', 'chị linh', 'anh minh', 'chị hà',
+    'người chơi', 'thành viên vip', 'cao thủ', 'chuyên gia', 'người thắng lớn'
   ];
   
   let hasSuccessPattern = false;
@@ -2321,19 +2563,43 @@ function extractAdvancedFraudEvidence(findings, evidenceText, summary) {
   const allText = `${evidenceText} ${findings.join(' ')} ${summary}`.toLowerCase();
   
   // Giả mạo chứng chỉ/giải thưởng
-  if (allText.match(/(chứng nhận.*?(quốc tế|iso|fda)|giải thưởng.*?(top|best|award)|được.*?công nhận.*?(chính thức|toàn cầu))/)) {
-    evidence.push("Tự xưng có chứng nhận/giải thưởng quốc tế không rõ nguồn gốc để tăng uy tín");
+  if (allText.match(/(chứng nhận|giấy phép|iso|fda|gmp|haccp|halal|ce|who|bộ y tế|bộ công thương|giải thưởng|top|best|award|được.*?công nhận|xác nhận|chứng thực)/)) {
+    evidence.push("Tự xưng có chứng nhận/giải thưởng quốc tế không rõ nguồn gốc, không thể xác minh được tính xác thực và không có thông tin chi tiết về đơn vị cấp phép");
   }
   
-  // Áp lực thời gian
-  if (allText.match(/(chỉ còn.*?(ngày|giờ|phút)|khuyến mãi.*?hết.*?hạn|nhanh tay|sale.*?sốc|giảm giá.*?cuối)/)) {
-    evidence.push("Tạo áp lực tâm lý bằng khuyến mãi có thời hạn và countdown giả để ép người dùng quyết định nhanh");
+  // Áp lực thời gian và số lượng
+  if (allText.match(/(chỉ còn|còn lại|sắp hết|sắp kết thúc|giới hạn|có hạn|nhanh tay|tranh thủ|duy nhất|cuối cùng|chớp ngay|nhanh chân|số lượng có hạn|chỉ.*?(ngày|giờ|phút)|khuyến mãi.*?hết.*?hạn|sale.*?sốc|giảm giá.*?cuối)/)) {
+    evidence.push("Tạo áp lực tâm lý bằng các chiêu trò như: countdown giả, thông báo sắp hết hàng, khuyến mãi có thời hạn, số lượng giới hạn để thúc đẩy người dùng ra quyết định nhanh mà không cân nhắc kỹ");
   }
   
   // Số lượng giả mạo
-  if (allText.match(/(hơn.*?\d+.*?(triệu|nghìn).*?người.*?sử dụng|đã.*?bán.*?\d+.*?(triệu|nghìn).*?sản phẩm)/)) {
-    evidence.push("Đưa ra các con số thống kê người dùng/doanh số không có nguồn xác thực");
+  if (allText.match(/(hơn.*?\d+.*?(triệu|nghìn).*?người.*?sử dụng|đã.*?bán.*?\d+.*?(triệu|nghìn).*?sản phẩm|khách hàng.*?hài lòng|đánh giá.*?sao|review.*?tốt|lượt mua|lượt đánh giá|lượt theo dõi|lượt xem|lượt tương tác)/)) {
+    evidence.push("Đưa ra các con số thống kê người dùng/doanh số và đánh giá không có nguồn xác thực, có dấu hiệu mua đánh giá ảo, tương tác ảo");
   }
-  
-  return evidence;
+
+  // Giả mạo địa chỉ và thông tin liên hệ
+  if (allText.match(/(văn phòng|chi nhánh|showroom|cửa hàng|địa chỉ|trụ sở|công ty|doanh nghiệp|nhà máy|xưởng sản xuất).*?(quận|phường|đường|số|tỉnh|thành phố)/)) {
+    evidence.push("Đưa ra địa chỉ văn phòng/cửa hàng/nhà máy không có thật hoặc mượn địa chỉ của đơn vị khác để tạo uy tín, không có giấy phép kinh doanh tại địa chỉ được nêu");
+  }
+
+  // Chiêu trò về giá và khuyến mãi 
+  if (allText.match(/(giá gốc|giá thị trường|giá công ty|chiết khấu|ưu đãi|khuyến mãi|giảm.*?%|tặng|free|miễn phí|mua 1 tặng 1|combo|deal shock|flash sale|siêu sale|sale sốc|giá hủy diệt)/)) {
+    evidence.push("Sử dụng các chiêu trò về giá như: Nâng giá gốc ảo để đánh lừa về mức giảm giá, khuyến mãi ảo, quà tặng không có thật, tạo cảm giác khan hiếm và giá trị cao");
+  }
+
+  // Lợi dụng tâm lý người dùng
+  if (allText.match(/(không còn lo|hết đau đầu|giải quyết|cam kết|bảo hành|hoàn tiền|đổi trả|không hiệu quả|trả lại tiền|100%|bảo đảm|chắc chắn|tuyệt đối|vĩnh viễn|trọn đời)/)) {
+    evidence.push("Lợi dụng tâm lý người dùng bằng các cam kết/bảo đảm mơ hồ, hứa hẹn quá mức về hiệu quả, không rõ ràng về điều kiện và quy trình thực hiện");
+  }
+
+  // Mạo danh thương hiệu
+  if (allText.match(/(chính hãng|authentic|auth|xuất xứ|nhập khẩu|phân phối|độc quyền|uỷ quyền|đại lý|nhà phân phối|thương hiệu|brand|made in|sản xuất tại|xuất xứ từ|hàng ngoại|hàng hiệu)/)) {
+    evidence.push("Mạo danh là đại lý/nhà phân phối chính hãng của các thương hiệu lớn mà không có giấy tờ chứng minh, giả mạo xuất xứ sản phẩm");
+  }
+
+  // Lợi dụng tin tức và sự kiện
+  if (allText.match(/(hot|trending|viral|xu hướng|thịnh hành|được ưa chuộng|được săn lùng|cháy hàng|best seller|bán chạy|hot hit|đình đám|gây sốt|làm mưa làm gió|phủ sóng)/)) {
+    evidence.push("Tạo hiệu ứng đám đông giả bằng cách nói sản phẩm/dịch vụ đang viral, được nhiều người quan tâm, tạo cảm giác sợ bỏ lỡ (FOMO)");
+  }
+
 }
