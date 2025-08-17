@@ -7,6 +7,61 @@ const API_UPLOAD = "https://chongluadao.vn/api/upload-image";
 const API_CHECK_URL = "https://kaiyobot.gis-humg.com/api/checkurl?url=";
 const API_CHECK_DOMAIN = "https://kaiyobot.gis-humg.com/api/checkmail?domain=";
 
+// ===== Multiple API Keys Manager =====
+class GeminiKeyManager {
+  constructor() {
+    this.keys = [];
+    this.currentIndex = 0;
+    this.failedKeys = new Set();
+    this.lastUsed = {};
+  }
+
+  // Thêm API keys từ storage
+  async loadKeys() {
+    const { geminiApiKeys = [] } = await chrome.storage.sync.get(["geminiApiKeys"]);
+    this.keys = geminiApiKeys.filter(key => key && key.trim());
+    console.log(`🔑 Loaded ${this.keys.length} Gemini API keys`);
+    return this.keys.length > 0;
+  }
+
+  // Lấy key tiếp theo (luân phiên theo thứ tự)
+  getNextKey() {
+    if (this.keys.length === 0) return null;
+    
+    // Luân phiên theo thứ tự, không quan tâm failed keys
+    const key = this.keys[this.currentIndex];
+    this.currentIndex = (this.currentIndex + 1) % this.keys.length;
+    
+    this.lastUsed[key] = Date.now();
+    console.log(`🔑 Using Gemini API key ${this.currentIndex}/${this.keys.length} (${key.substring(0, 10)}...)`);
+    return key;
+  }
+
+  // Đánh dấu key bị lỗi
+  markKeyFailed(key) {
+    this.failedKeys.add(key);
+    console.log(`❌ Marked API key as failed: ${key.substring(0, 10)}...`);
+  }
+
+  // Reset tất cả failed keys
+  resetFailedKeys() {
+    this.failedKeys.clear();
+    console.log("🔄 Reset all failed API keys");
+  }
+
+  // Lấy thống kê sử dụng
+  getStats() {
+    return {
+      totalKeys: this.keys.length,
+      failedKeys: this.failedKeys.size,
+      availableKeys: this.keys.length - this.failedKeys.size
+    };
+  }
+}
+
+// Khởi tạo key manager
+const geminiKeyManager = new GeminiKeyManager();
+
 const nowIso = () => new Date().toISOString();
 const dataUrlToBase64 = (d) => d.split(",")[1];
 
@@ -313,6 +368,71 @@ function extractContentEvidence(context, evidenceText) {
       evidence.push(`Domain "${context.domain}" được đặt tên gợi ý rõ ràng hoạt động mua bán bất hợp pháp`);
     }
   }
+
+  // Bằng chứng từ meta description
+  if (context.meta_tags && context.meta_tags.description) {
+    const desc = context.meta_tags.description.toLowerCase();
+    if (desc.includes('mua bán') || desc.includes('giao dịch') || desc.includes('ẩn danh')) {
+      evidence.push(`Meta description chứa từ khóa đáng ngờ liên quan đến hoạt động mua bán trái phép`);
+    }
+  }
+
+  // Bằng chứng từ hình ảnh
+  if (suspicious.suspicious_images && suspicious.suspicious_images.length > 0) {
+    const imgTypes = suspicious.suspicious_images.map(img => img.type).join(', ');
+    evidence.push(`Phát hiện ${suspicious.suspicious_images.length} hình ảnh có nội dung không phù hợp thuộc loại: ${imgTypes}`);
+  }
+
+  // Bằng chứng từ liên kết ngoài
+  if (suspicious.suspicious_links && suspicious.suspicious_links.length > 0) {
+    const domains = suspicious.suspicious_links.map(link => link.domain).slice(0,3).join(', ');
+    evidence.push(`Phát hiện ${suspicious.suspicious_links.length} liên kết đến các trang web đáng ngờ như: ${domains}`);
+  }
+
+  // Bằng chứng từ form đăng ký/đăng nhập
+  if (suspicious.login_forms && suspicious.login_forms.length > 0) {
+    const sensitiveFields = suspicious.login_forms.flatMap(form => form.sensitive_fields).join(', ');
+    evidence.push(`Phát hiện ${suspicious.login_forms.length} form thu thập thông tin nhạy cảm: ${sensitiveFields}`);
+  }
+
+  // Bằng chứng từ cookie tracking
+  if (suspicious.tracking_cookies && suspicious.tracking_cookies.length > 0) {
+    const cookieTypes = suspicious.tracking_cookies.map(cookie => cookie.type).join(', ');
+    evidence.push(`Phát hiện ${suspicious.tracking_cookies.length} cookie theo dõi loại: ${cookieTypes}`);
+  }
+
+  // Bằng chứng từ mã nguồn ẩn
+  if (suspicious.hidden_code && suspicious.hidden_code.length > 0) {
+    evidence.push(`Phát hiện ${suspicious.hidden_code.length} đoạn mã nguồn được ẩn giấu trong trang web`);
+  }
+
+  // Bằng chứng từ redirect chains
+  if (suspicious.redirect_chains && suspicious.redirect_chains.length > 0) {
+    evidence.push(`Phát hiện chuỗi ${suspicious.redirect_chains.length} redirect đáng ngờ qua nhiều domain khác nhau`);
+  }
+
+  // Bằng chứng từ pop-up/pop-under
+  if (suspicious.popup_detected) {
+    evidence.push(`Phát hiện ${suspicious.popup_count || 'nhiều'} cửa sổ pop-up/pop-under tự động`);
+  }
+
+  // Bằng chứng từ phân tích nội dung
+  if (suspicious.content_analysis) {
+    const riskFactors = suspicious.content_analysis.risk_factors || [];
+    if (riskFactors.length > 0) {
+      evidence.push(`Phân tích nội dung phát hiện các yếu tố rủi ro: ${riskFactors.join(', ')}`);
+    }
+  }
+
+  // Bằng chứng từ kỹ thuật SEO đen
+  if (suspicious.black_hat_seo && suspicious.black_hat_seo.techniques) {
+    evidence.push(`Phát hiện các kỹ thuật SEO đen: ${suspicious.black_hat_seo.techniques.join(', ')}`);
+  }
+
+  // Bằng chứng từ mã độc
+  if (suspicious.malware_signatures && suspicious.malware_signatures.length > 0) {
+    evidence.push(`Phát hiện ${suspicious.malware_signatures.length} chữ ký mã độc trong mã nguồn`);
+  }
   
   return evidence;
 }
@@ -456,32 +576,56 @@ function analyzeWebsiteType(category, summary, evidenceText) {
   const allText = `${summary} ${evidenceText}`.toLowerCase();
   
   // CHUYÊN BIỆT: Phát hiện chợ đen, tiền bẩn, CCV lậu
-  if (allText.match(/(chợ đen|tiền bẩn|ccv|thẻ tín dụng|đánh cắp|rửa tiền|tài khoản lậu|hack|crack|dump)/)) {
+  if (allText.match(/(chợ đen|tiền bẩn|ccv|thẻ tín dụng|đánh cắp|rửa tiền|tài khoản lậu|hack|crack|dump|dark web|black market)/)) {
     return "Trang web tự nhận là \"Chợ Đen\" và công khai mua bán \"tiền bẩn\", CCV (thông tin thẻ tín dụng đánh cắp), và các loại tài khoản lậu";
   }
   
   // CHUYÊN BIỆT: Phát hiện các từ ngữ phi pháp
-  if (allText.match(/(tienban|money dirty|illegal|stolen|fraud|scam|phishing)/)) {
+  if (allText.match(/(tienban|money dirty|illegal|stolen|fraud|scam|phishing|lừa đảo|gian lận|phi pháp|bất hợp pháp|trái phép)/)) {
     return "Sử dụng các từ ngữ như \"tiền bẩn\", \"CCV lậu\", \"rửa tiền\" cho thấy hoạt động phi pháp";
   }
   
-  if (allText.match(/(game|tài khoản|acc|shop game|bán acc)/)) {
-    return "Trang web bán tài khoản game trực tuyến với nhiều dấu hiệu đáng ngờ";
+  // CHUYÊN BIỆT: Phát hiện trang game lậu
+  if (allText.match(/(game|tài khoản|acc|shop game|bán acc|nick game|hack game|mod game|cheat|tool game|auto game)/)) {
+    return "Trang web bán tài khoản game trực tuyến với nhiều dấu hiệu đáng ngờ và công cụ hack/cheat game";
   }
-  if (allText.match(/(đầu tư|forex|bitcoin|crypto|trading)/)) {
-    return "Trang web đầu tư tài chính trực tuyến không có giấy phép hoạt động";
+
+  // CHUYÊN BIỆT: Phát hiện trang đầu tư lừa đảo
+  if (allText.match(/(đầu tư|forex|bitcoin|crypto|trading|coin|tiền ảo|đa cấp|mlm|kiếm tiền nhanh|lợi nhuận cao|bảo hiểm|thu nhập thụ động)/)) {
+    return "Trang web đầu tư tài chính trực tuyến không có giấy phép, dấu hiệu lừa đảo đa cấp";
   }
-  if (allText.match(/(ngân hàng|bank|atm|chuyển khoản)/)) {
-    return "Trang web mạo danh ngân hàng để đánh cắp thông tin tài khoản";
+
+  // CHUYÊN BIỆT: Phát hiện giả mạo ngân hàng
+  if (allText.match(/(ngân hàng|bank|atm|chuyển khoản|internet banking|mobile banking|ví điện tử|e-wallet|thanh toán|payment)/)) {
+    return "Trang web mạo danh ngân hàng/ví điện tử để đánh cắp thông tin tài khoản và tiền của người dùng";
   }
-  if (allText.match(/(casino|cờ bạc|cá cược|lô đề)/)) {
-    return "Trang web cờ bạc trực tuyến trái phép luật pháp Việt Nam";
+
+  // CHUYÊN BIỆT: Phát hiện cờ bạc trực tuyến
+  if (allText.match(/(casino|cờ bạc|cá cược|lô đề|number game|slot|poker|baccarat|roulette|xổ số|game bài|đánh bài)/)) {
+    return "Trang web cờ bạc trực tuyến trái phép với nhiều hình thức cá cược khác nhau";
   }
-  if (allText.match(/(shopee|lazada|tiki|mua sắm)/)) {
-    return "Trang web mạo danh sàn thương mại điện tử để lừa đảo";
+
+  // CHUYÊN BIỆT: Phát hiện giả mạo sàn TMĐT
+  if (allText.match(/(shopee|lazada|tiki|sendo|mua sắm|thương mại điện tử|giảm giá|khuyến mãi|flash sale|deal sốc|order|cod)/)) {
+    return "Trang web mạo danh sàn thương mại điện tử uy tín để lừa đảo người mua hàng";
+  }
+
+  // CHUYÊN BIỆT: Phát hiện web bán hàng giả
+  if (allText.match(/(hàng giả|fake|nhái|super fake|replica|copy|hàng nhập|xách tay|giá rẻ|sale off|clearance)/)) {
+    return "Trang web chuyên bán hàng giả, hàng nhái các thương hiệu nổi tiếng";
+  }
+
+  // CHUYÊN BIỆT: Phát hiện web khiêu dâm
+  if (allText.match(/(sex|porn|xxx|người lớn|chat sex|gái gọi|massage|sugar|dating|hẹn hò|tình một đêm)/)) {
+    return "Trang web có nội dung người lớn, khiêu dâm trái pháp luật";
+  }
+
+  // CHUYÊN BIỆT: Phát hiện web bán thuốc
+  if (allText.match(/(thuốc|medicine|drug|thực phẩm chức năng|vitamin|thảo dược|đông y|tăng cường|cải thiện|chữa bệnh)/)) {
+    return "Trang web bán thuốc, thực phẩm chức năng không rõ nguồn gốc";
   }
   
-  return `Trang web ${category.toLowerCase()} với các hoạt động đáng ngờ`;
+  return `Trang web ${category.toLowerCase()} với các hoạt động đáng ngờ và dấu hiệu lừa đảo`;
 }
 
 // Phân tích tính minh bạch và thông tin pháp lý
@@ -496,6 +640,27 @@ function analyzeLegalTransparency(evidenceText, technicalAnalysis) {
   }
   if (allText.match(/(ẩn.*whois|private.*registration|contact.*hidden)/)) {
     return "Thông tin đăng ký domain bị ẩn hoặc sử dụng dịch vụ private registration";
+  }
+  if (allText.match(/(không.*chính sách|thiếu.*điều khoản|không.*quy định)/)) {
+    return "Không có chính sách và điều khoản sử dụng rõ ràng";
+  }
+  if (allText.match(/(không.*bảo hành|thiếu.*chế độ|không.*đổi trả)/)) {
+    return "Không có chính sách bảo hành, đổi trả hàng rõ ràng";
+  }
+  if (allText.match(/(không.*hóa đơn|thiếu.*chứng từ|không.*biên lai)/)) {
+    return "Không xuất hóa đơn, chứng từ thanh toán hợp pháp";
+  }
+  if (allText.match(/(không.*thuế|trốn.*thuế|gian lận.*thuế)/)) {
+    return "Có dấu hiệu trốn thuế, không kê khai thuế";
+  }
+  if (allText.match(/(không.*đăng ký|thiếu.*giấy phép|hoạt động.*chui)/)) {
+    return "Hoạt động kinh doanh không đăng ký, không phép";
+  }
+  if (allText.match(/(lách.*luật|né.*thuế|gian lận.*pháp luật)/)) {
+    return "Có dấu hiệu lách luật, gian lận pháp luật";
+  }
+  if (allText.match(/(không.*bảo vệ.*dữ liệu|thiếu.*chính sách.*riêng tư|lộ.*thông tin)/)) {
+    return "Không có chính sách bảo vệ dữ liệu và quyền riêng tư";
   }
   
   return null;
@@ -513,6 +678,15 @@ function analyzeSecurityIssues(technicalAnalysis, evidenceText) {
   }
   if (allText.match(/(tracking.*script|third.*party.*code|external.*script)/)) {
     return "Tích hợp nhiều script tracking và mã từ bên thứ ba không rõ nguồn gốc";
+  }
+  if (allText.match(/(malware|virus|trojan|backdoor|keylogger)/)) {
+    return "Phát hiện mã độc, virus hoặc phần mềm gián điệp";
+  }
+  if (allText.match(/(iframe.*ẩn|hidden.*frame|invisible.*element)/)) {
+    return "Sử dụng iframe ẩn và các element không hiển thị đáng ngờ";
+  }
+  if (allText.match(/(form.*không.*bảo mật|unencrypted.*form|plain.*text.*password)/)) {
+    return "Form đăng nhập/đăng ký không được mã hóa, gửi dữ liệu dạng plain text";
   }
   
   return null;
@@ -837,13 +1011,33 @@ Báo cáo này được tạo tự động bởi hệ thống AI dựa trên ph�
 
 // Upload ảnh (JSON payload: { image: <base64>, filename })
 async function uploadImageJSON({ base64, filename, headers = {} }) {
+  try {
+    console.log(`📤 Uploading ${filename} (${base64.length} chars)`);
+    
+    // Validate base64 data
+    if (!base64 || base64.length < 100) {
+      console.error(`❌ Invalid base64 data for ${filename}: length=${base64.length}`);
+      throw new Error(`Invalid image data for ${filename}`);
+    }
+    
   const res = await fetch(API_UPLOAD, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...headers },
     body: JSON.stringify({ image: base64, filename })
   });
-  if (!res.ok) throw new Error(`Upload failed ${res.status}`);
-  return res.json();
+    
+    if (!res.ok) {
+      console.error(`❌ Upload failed for ${filename}: ${res.status} ${res.statusText}`);
+      throw new Error(`Upload failed ${res.status} for ${filename}`);
+    }
+    
+    const result = await res.json();
+    console.log(`✅ Upload successful for ${filename}:`, result);
+    return result;
+  } catch (error) {
+    console.error(`❌ Upload error for ${filename}:`, error);
+    throw error;
+  }
 }
 
 // Chụp màn hình tab đang hiển thị
@@ -881,11 +1075,14 @@ async function captureFullPage(tabId) {
   const startTime = Date.now();
   
   try {
+    console.log(`🚀 BẮT ĐẦU CHỤP TOÀN TRANG - Tab ID: ${tabId}`);
+    
     // Ẩn extension UI và đo kích thước chính xác
+    console.log(`📏 ĐANG ĐO KÍCH THƯỚC TRANG...`);
     const dimensionsPromise = chrome.scripting.executeScript({
       target: { tabId },
       func: () => {
-        // Ẩn tất cả extension elements để tránh che
+        // Ẩn tất cả extension elements và taskbar
         const extensionElements = document.querySelectorAll('[data-extension], [id*="extension"], [class*="extension"]');
         const hiddenElements = [];
         extensionElements.forEach(el => {
@@ -894,6 +1091,26 @@ async function captureFullPage(tabId) {
             el.style.display = 'none';
           }
         });
+        
+        // Ẩn scrollbars và taskbar
+        const style = document.createElement('style');
+        style.id = 'fullpage-capture-style';
+        style.textContent = `
+          ::-webkit-scrollbar { display: none !important; }
+          body { 
+            overflow: hidden !important; 
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+          * { 
+            scrollbar-width: none !important; 
+            -ms-overflow-style: none !important;
+          }
+          html {
+            overflow: hidden !important;
+          }
+        `;
+        document.head.appendChild(style);
         
         // Scroll lên đầu trang để đo chính xác
         const originalScrollX = window.scrollX;
@@ -915,7 +1132,7 @@ async function captureFullPage(tabId) {
           html.getBoundingClientRect().height
         );
         
-        // Thêm buffer cho width để tránh bị cắt
+        // Thêm buffer lớn cho width để tránh cắt góc phải
         const contentWidth = Math.max(
           body.scrollWidth,
           body.offsetWidth,
@@ -924,7 +1141,7 @@ async function captureFullPage(tabId) {
           html.offsetWidth,
           body.getBoundingClientRect().width,
           html.getBoundingClientRect().width,
-          window.innerWidth + 50 // Thêm 50px buffer
+          window.innerWidth + 500 // Tăng buffer lên 500px để tránh cắt góc
         );
         
         const viewportHeight = window.innerHeight;
@@ -934,9 +1151,13 @@ async function captureFullPage(tabId) {
         window.scrollTo(contentWidth - viewportWidth, 0);
         const maxScrollX = window.scrollX;
         
+        // Scroll xuống tận cùng để đo chiều cao thực tế
         window.scrollTo(0, contentHeight);
         const maxScrollY = window.scrollY;
         const actualHeight = maxScrollY + viewportHeight;
+        
+        // Thêm buffer cho chiều cao để đảm bảo không bỏ sót
+        const finalHeight = Math.max(contentHeight, actualHeight) + 200;
         
         // Khôi phục vị trí ban đầu
         window.scrollTo(originalScrollX, originalScrollY);
@@ -946,9 +1167,13 @@ async function captureFullPage(tabId) {
           element.style.display = originalDisplay;
         });
         
+        // Dọn dẹp style
+        const existingStyle = document.getElementById('fullpage-capture-style');
+        if (existingStyle) existingStyle.remove();
+        
         return {
           width: contentWidth,
-          height: Math.max(contentHeight, actualHeight),
+          height: finalHeight,
           contentHeight: contentHeight,
           actualHeight: actualHeight,
           maxScrollY: maxScrollY,
@@ -971,35 +1196,84 @@ async function captureFullPage(tabId) {
     const { width, height, viewportHeight, viewportWidth, originalScrollX, originalScrollY, 
             contentHeight, actualHeight, maxScrollY, maxScrollX, hasHorizontalScroll } = dimensions;
     
-    console.log(`Page dimensions: ${width}x${height} (content: ${contentHeight}, viewport: ${viewportWidth}x${viewportHeight}, horizontalScroll: ${hasHorizontalScroll})`);
+    console.log(`✅ ĐO KÍCH THƯỚC THÀNH CÔNG!`);
+    console.log(`📏 Kích thước trang: ${width}x${height}px`);
+    console.log(`📏 Kích thước viewport: ${viewportWidth}x${viewportHeight}px`);
+    console.log(`📏 Tỷ lệ: ${(height/viewportHeight).toFixed(2)}x`);
+    console.log(`📏 Có scroll ngang: ${hasHorizontalScroll ? 'CÓ' : 'KHÔNG'}`);
     
     // Logic thông minh để quyết định có nên full capture hay không
-    const maxReasonableHeight = viewportHeight * 8; // Tăng từ 6 lên 8 để capture trang dài hơn
-    const estimatedTime = Math.ceil(height / viewportHeight) * 600; // Giảm thời gian ước tính
+    const maxReasonableHeight = viewportHeight * 20; // Tăng lên 20 để chụp trang dài
+    const estimatedTime = Math.ceil(height / viewportHeight) * 800; // Tăng thời gian ước tính
     
-    // Fallback về capture thường nếu:
-    if (height <= viewportHeight * 1.8 ||           // Trang ngắn (giảm từ 2.5 xuống 1.8)
-        height > maxReasonableHeight ||             // Trang quá dài  
-        estimatedTime > 20000) {                    // Ước tính > 20 giây
-      
-      console.log(`Using quick capture: height=${height}, estimated_time=${estimatedTime}ms`);
-      
-      // Nếu có horizontal scroll, thử capture với scroll về 0,0 trước
-      if (hasHorizontalScroll) {
-        await chrome.scripting.executeScript({
-          target: { tabId },
-          func: () => window.scrollTo(0, 0)
-        });
-        await new Promise(resolve => setTimeout(resolve, 300));
-      }
-      
+    console.log(`🤔 QUYẾT ĐỊNH PHƯƠNG PHÁP CHỤP:`);
+    console.log(`🤔 Chiều cao tối đa cho phép: ${maxReasonableHeight}px`);
+    console.log(`🤔 Thời gian ước tính: ${estimatedTime}ms`);
+    
+    // CHỈ fallback về capture thường nếu trang THỰC SỰ ngắn hơn viewport:
+    if (height <= viewportHeight * 1.05) {          // CHỈ trang ngắn hơn viewport + 5%
+      console.log(`📸 CHUYỂN SANG CHỤP VIEWPORT: Trang quá ngắn`);
+      console.log(`📸 Lý do: height=${height}px ≤ viewport=${viewportHeight}px * 1.05`);
       return await captureVisible();
     }
+    
+    // Fallback về capture thường nếu trang QUÁ dài (chỉ khi thực sự cần thiết)
+    if (height > maxReasonableHeight && estimatedTime > 30000) {
+      console.log(`📸 CHUYỂN SANG CHỤP VIEWPORT: Trang QUÁ dài và QUÁ lâu`);
+      console.log(`📸 Lý do: height=${height}px > ${maxReasonableHeight}px VÀ time=${estimatedTime}ms > 30000ms`);
+      return await captureVisible();
+    }
+    
+    // Nếu trang quá dài hoặc ước tính quá lâu, dùng quick multi-chunk capture
+    if (height > maxReasonableHeight || estimatedTime > 25000) {
+      console.log(`⚡ QUICK MULTI-CHUNK: Trang quá dài height=${height}px > ${maxReasonableHeight}px hoặc time=${estimatedTime}ms > 25000ms`);
+      
+      // Capture ít nhất 3 chunks để có được nhiều nội dung hơn viewport
+      const quickChunks = Math.min(3, Math.ceil(height / viewportHeight));
+      const quickScreenshots = [];
+      
+      for (let i = 0; i < quickChunks; i++) {
+        const scrollY = i === quickChunks - 1 
+          ? Math.max(0, height - viewportHeight)  // Chunk cuối
+          : (i * viewportHeight * 0.8); // 20% overlap
+        
+        await chrome.scripting.executeScript({
+          target: { tabId },
+          func: (y) => window.scrollTo(0, y),
+          args: [scrollY]
+        });
+        
+        await new Promise(resolve => setTimeout(resolve, 500));
+        const screenshot = await captureWithRetry();
+        quickScreenshots.push({ dataUrl: screenshot, scrollY });
+      }
+      
+      // Ghép các quick chunks lại
+      if (quickScreenshots.length > 1) {
+        return await stitchScreenshots(quickScreenshots, { 
+          width: viewportWidth, 
+          height: quickChunks * viewportHeight * 0.8 + viewportHeight * 0.2,
+          viewportHeight, 
+          viewportWidth 
+        });
+      } else {
+        return quickScreenshots[0]?.dataUrl || await captureVisible();
+      }
+    }
+    
+    // Log để debug - FORCE full page capture
+    console.log(`FORCING FULL PAGE CAPTURE: height=${height}px, viewport=${viewportHeight}px, ratio=${(height/viewportHeight).toFixed(2)}, chunks=${Math.ceil(height / viewportHeight)}`);
+    
 
     // Tăng số lần scroll để capture đầy đủ hơn
-    const maxChunks = 15; // Tăng từ 10 lên 15 để chụp đầy đủ hơn
+    const maxChunks = 25; // Tăng lên 25 để chụp trang dài
     const verticalChunks = Math.min(Math.ceil(height / viewportHeight), maxChunks);
     const horizontalChunks = hasHorizontalScroll ? 2 : 1; // Nếu có horizontal scroll thì chụp 2 cột
+    
+    console.log(`📸 BẮT ĐẦU CHỤP TOÀN TRANG!`);
+    console.log(`📸 Số chunks dọc: ${verticalChunks}`);
+    console.log(`📸 Số chunks ngang: ${horizontalChunks}`);
+    console.log(`📸 Tổng số chunks: ${verticalChunks * horizontalChunks}`);
     const screenshots = [];
 
     console.log(`Starting full page capture: ${verticalChunks} vertical × ${horizontalChunks} horizontal chunks`);
@@ -1012,105 +1286,67 @@ async function captureFullPage(tabId) {
         const chunkStart = Date.now();
         const chunkIndex = row * horizontalChunks + col;
         
-        // Tính toán vị trí scroll vertical với overlap tốt hơn
+        // Tính toán vị trí scroll với overlap lớn để đảm bảo không bỏ sót
         let scrollY;
         if (row === 0) {
           scrollY = 0;
         } else if (row === verticalChunks - 1) {
-          // Chunk cuối: đảm bảo chụp hết footer
+          // Chunk cuối: đảm bảo chụp hết footer - scroll xuống tận cùng
           scrollY = Math.max(0, height - viewportHeight);
+          
+          // Thêm buffer cho chunk cuối để đảm bảo không bỏ sót
+          scrollY = Math.max(0, scrollY - 200);
         } else {
-          // Overlap 15% để đảm bảo không bỏ sót nội dung
-          const overlapPixels = Math.floor(viewportHeight * 0.15);
-          scrollY = (row * viewportHeight) - overlapPixels;
+          // Overlap 30% để đảm bảo không bỏ sót nội dung
+          const overlapPixels = Math.floor(viewportHeight * 0.3);
+          scrollY = Math.max(0, (row * viewportHeight) - overlapPixels);
         }
         
-        // Tính toán vị trí scroll horizontal
-        let scrollX = 0;
-        if (horizontalChunks > 1) {
-          if (col === 0) {
-            scrollX = 0;
-          } else {
-            // Scroll sang phải để chụp phần còn lại
-            scrollX = Math.min(maxScrollX, viewportWidth * 0.7); // Overlap 30%
-          }
-        }
+        console.log(`📸 CHỤP CHUNK ${chunkIndex + 1}/${verticalChunks * horizontalChunks}:`);
+        console.log(`📸   - Vị trí: row=${row}, col=${col}`);
+        console.log(`📸   - Scroll Y: ${scrollY}px`);
         
-        // Scroll đến vị trí chính xác
+        // Scroll đơn giản và nhanh
+        console.log(`📸   - Đang scroll đến vị trí...`);
         await chrome.scripting.executeScript({
           target: { tabId },
-          func: (x, y) => {
-            // Ẩn extension elements trước khi chụp
-            const extensionElements = document.querySelectorAll('[data-extension], [id*="extension"], [class*="extension"]');
-            extensionElements.forEach(el => {
-              el.style.visibility = 'hidden';
-            });
-            
+          func: (y) => {
             window.scrollTo({
               top: y,
-              left: x,
+              left: 0,
               behavior: 'instant'
             });
-            
-            // Đảm bảo scroll chính xác
-            const actualY = window.scrollY;
-            const actualX = window.scrollX;
-            if (Math.abs(actualY - y) > 5 || Math.abs(actualX - x) > 5) {
-              window.scrollTo(x, y);
-            }
           },
-          args: [scrollX, scrollY]
+          args: [scrollY]
         });
 
-        // Delay để trang ổn định
-        const minDelayBetweenCaptures = 700;
-        await new Promise(resolve => setTimeout(resolve, minDelayBetweenCaptures));
+        // Delay dài hơn để đảm bảo chất lượng tốt
+        console.log(`📸   - Đợi trang ổn định (800ms)...`);
+        await new Promise(resolve => setTimeout(resolve, 800));
 
         try {
-          // Lấy vị trí scroll thực tế sau khi ổn định
-          const [{ result: actualScrollData }] = await chrome.scripting.executeScript({
-            target: { tabId },
-            func: () => ({
-              scrollY: window.scrollY,
-              scrollX: window.scrollX,
-              viewportHeight: window.innerHeight,
-              viewportWidth: window.innerWidth
-            })
-          });
-
-          // Chụp màn hình với retry
+          // Chụp màn hình
+          console.log(`📸   - Đang chụp screenshot...`);
           const screenshot = await captureWithRetry(3);
+          
+          // Lưu thông tin đơn giản
           screenshots.push({
             dataUrl: screenshot,
-            scrollY: actualScrollData.scrollY,
-            scrollX: actualScrollData.scrollX,
-            plannedScrollY: scrollY,
-            plannedScrollX: scrollX,
-            chunkIndex: chunkIndex,
-            row: row,
-            col: col,
-            actualViewport: {
-              width: actualScrollData.viewportWidth,
-              height: actualScrollData.viewportHeight
-            }
+            scrollY: scrollY
           });
 
-          const chunkTime = Date.now() - chunkStart;
-          console.log(`Chunk [${row},${col}]: planned=(${scrollX},${scrollY}), actual=(${actualScrollData.scrollX},${actualScrollData.scrollY}), time=${chunkTime}ms`);
+          console.log(`✅ CHUNK ${chunkIndex + 1} THÀNH CÔNG!`);
+          console.log(`✅   - Scroll Y: ${scrollY}px`);
+          console.log(`✅   - Screenshot size: ${screenshot.length} chars`);
           
         } catch (error) {
-          console.error(`Failed to capture chunk [${row},${col}]:`, error);
-          
-          // Nếu fail quá nhiều chunk thì dừng
-          if (screenshots.length === 0 && chunkIndex > 2) {
-            throw new Error("Too many capture failures, falling back to visible area");
-          }
-          
+          console.error(`❌ CHUNK ${chunkIndex + 1} THẤT BẠI!`);
+          console.error(`❌   - Lỗi:`, error);
           continue;
         }
 
-        // Timeout check - tăng lên 45 giây cho trang dài
-        if (Date.now() - startTime > 45000) {
+        // Timeout check - tăng lên 90 giây để chụp trang dài
+        if (Date.now() - startTime > 90000) {
           console.warn("Full page capture timeout, using current chunks");
           break;
         }
@@ -1148,48 +1384,52 @@ async function captureFullPage(tabId) {
   }
 }
 
-// Ghép các screenshot thành một ảnh duy nhất với xử lý cả vertical và horizontal
+// Ghép các screenshot thành một ảnh duy nhất - ĐƠN GIẢN HÓA HOÀN TOÀN
 async function stitchScreenshots(screenshots, dimensions) {
-  console.log(`Stitching ${screenshots.length} screenshots...`);
+  console.log(`🔧 Stitching ${screenshots.length} screenshots...`);
   
   if (screenshots.length === 0) {
     throw new Error("No screenshots to stitch");
   }
   
   if (screenshots.length === 1) {
+    console.log(`📸 Single screenshot, returning directly`);
     return screenshots[0].dataUrl;
   }
   
-  const { width, height, viewportHeight, viewportWidth, hasHorizontalScroll } = dimensions;
+  // Validate screenshots data
+  for (let i = 0; i < screenshots.length; i++) {
+    const ss = screenshots[i];
+    if (!ss.dataUrl || !ss.dataUrl.startsWith('data:image/')) {
+      console.error(`❌ Invalid screenshot ${i}:`, ss);
+      throw new Error(`Invalid screenshot data at index ${i}`);
+    }
+  }
   
-  // Sắp xếp screenshots theo row, sau đó theo col
-  screenshots.sort((a, b) => {
-    if (a.row !== b.row) return a.row - b.row;
-    return a.col - b.col;
-  });
+  const { width, height, viewportHeight, viewportWidth } = dimensions;
   
-  // Tính toán kích thước canvas
-  const maxRow = Math.max(...screenshots.map(s => s.row || 0));
-  const maxCol = Math.max(...screenshots.map(s => s.col || 0));
-  const actualCanvasHeight = Math.max(height, (maxRow + 1) * viewportHeight);
-  const actualCanvasWidth = hasHorizontalScroll ? Math.max(width, viewportWidth * 1.3) : viewportWidth;
+  // Sắp xếp screenshots theo scrollY (đơn giản)
+  screenshots.sort((a, b) => (a.scrollY || 0) - (b.scrollY || 0));
   
-  // Tạo canvas
-  const canvas = new OffscreenCanvas(actualCanvasWidth, actualCanvasHeight);
+  console.log(`📊 Screenshots sorted by scrollY:`, screenshots.map(s => s.scrollY));
+  
+  // Tạo canvas với buffer cực lớn để tránh cắt góc phải
+  const canvasWidth = viewportWidth + 300; // Tăng buffer lên 300px
+  const canvas = new OffscreenCanvas(canvasWidth, height);
   const ctx = canvas.getContext("2d");
   
   // Fill background trắng
   ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, actualCanvasWidth, actualCanvasHeight);
+  ctx.fillRect(0, 0, canvasWidth, height);
   
-  console.log(`Canvas size: ${actualCanvasWidth}x${actualCanvasHeight}, screenshots arranged in ${maxRow + 1}x${maxCol + 1} grid`);
+  console.log(`🎨 Canvas created: ${canvasWidth}x${height}`);
   
-  // Vẽ từng chunk
+  // Vẽ từng screenshot với buffer cực lớn
   for (let i = 0; i < screenshots.length; i++) {
     const screenshot = screenshots[i];
-    const { dataUrl, scrollY, scrollX, row, col, actualViewport } = screenshot;
+    const { dataUrl, scrollY } = screenshot;
     
-    console.log(`Processing chunk [${row},${col}]: scroll=(${scrollX},${scrollY})`);
+    console.log(`📸 Processing screenshot ${i}: scrollY=${scrollY}`);
     
     try {
       // Tạo image từ dataUrl
@@ -1197,78 +1437,44 @@ async function stitchScreenshots(screenshots, dimensions) {
       const blob = await response.blob();
       const imageBitmap = await createImageBitmap(blob);
       
-      const chunkViewportHeight = actualViewport?.height || viewportHeight;
-      const chunkViewportWidth = actualViewport?.width || viewportWidth;
+      // Vẽ với buffer cực lớn để tránh cắt góc
+      ctx.drawImage(imageBitmap, 150, scrollY); // Offset 150px để center
       
-      // Tính toán vị trí vẽ
-      let drawX = col * viewportWidth * 0.7; // Overlap 30% cho horizontal
-      let drawY = scrollY;
-      let sourceX = 0;
-      let sourceY = 0;
-      let drawWidth = chunkViewportWidth;
-      let drawHeight = chunkViewportHeight;
+      console.log(`✅ Drew screenshot ${i} at Y=${scrollY} with offset`);
       
-      // Xử lý overlap vertical
-      if (row > 0) {
-        const sameColPrevious = screenshots.find(s => s.col === col && s.row === row - 1);
-        if (sameColPrevious) {
-          const prevEndY = sameColPrevious.scrollY + chunkViewportHeight;
-          if (scrollY < prevEndY) {
-            const overlapHeight = prevEndY - scrollY;
-            sourceY = overlapHeight;
-            drawY = prevEndY;
-            drawHeight = chunkViewportHeight - overlapHeight;
-          }
-        }
-      }
-      
-      // Xử lý overlap horizontal  
-      if (col > 0) {
-        const sameRowPrevious = screenshots.find(s => s.row === row && s.col === col - 1);
-        if (sameRowPrevious) {
-          const overlapWidth = chunkViewportWidth * 0.3;
-          sourceX = overlapWidth;
-          drawWidth = chunkViewportWidth - overlapWidth;
-        }
-      }
-      
-      // Đảm bảo không vẽ quá canvas
-      if (drawX + drawWidth > actualCanvasWidth) {
-        drawWidth = actualCanvasWidth - drawX;
-      }
-      if (drawY + drawHeight > actualCanvasHeight) {
-        drawHeight = actualCanvasHeight - drawY;
-      }
-      
-      // Vẽ lên canvas
-      if (drawWidth > 0 && drawHeight > 0) {
-        ctx.drawImage(
-          imageBitmap,
-          sourceX, sourceY, drawWidth, drawHeight,
-          drawX, drawY, drawWidth, drawHeight
-        );
-        
-        console.log(`Drew chunk [${row},${col}]: source(${sourceX},${sourceY},${drawWidth},${drawHeight}) -> dest(${drawX},${drawY},${drawWidth},${drawHeight})`);
-      }
     } catch (error) {
-      console.error(`Failed to process chunk [${row},${col}]:`, error);
+      console.error(`❌ Failed to process screenshot ${i}:`, error);
       continue;
     }
   }
   
   // Convert canvas to dataUrl
-  const outputBlob = await canvas.convertToBlob({ type: "image/jpeg", quality: 0.8 });
-  const arrayBuffer = await outputBlob.arrayBuffer();
-  const bytes = new Uint8Array(arrayBuffer);
-  let binary = '';
-  for (let i = 0; i < bytes.byteLength; i++) {
-    binary += String.fromCharCode(bytes[i]);
+  try {
+    const outputBlob = await canvas.convertToBlob({ type: "image/jpeg", quality: 0.8 });
+    const arrayBuffer = await outputBlob.arrayBuffer();
+    const bytes = new Uint8Array(arrayBuffer);
+    let binary = '';
+    for (let i = 0; i < bytes.byteLength; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    const base64 = btoa(binary);
+    
+    console.log(`✅ Stitching completed: ${base64.length} chars`);
+    
+    // Validate output
+    if (base64.length < 100) {
+      console.error(`❌ Stitched image too small (${base64.length} chars), likely blank`);
+      throw new Error("Stitched image appears to be blank");
+    }
+    
+    return `data:image/jpeg;base64,${base64}`;
+  } catch (error) {
+    console.error(`❌ Canvas conversion failed:`, error);
+    
+    // Fallback: return first screenshot
+    console.log(`🔄 Fallback: returning first screenshot`);
+    return screenshots[0].dataUrl;
   }
-  const base64 = btoa(binary);
-  
-  console.log(`Stitching completed: final size ${actualCanvasWidth}x${actualCanvasHeight}`);
-  
-  return `data:image/jpeg;base64,${base64}`;
 }
 
 // Lấy ngữ cảnh trang chi tiết (để gửi kèm cho Gemini)
@@ -1642,7 +1848,8 @@ async function annotateWithAI(dataUrl, report) {
     }
   }
 
-  const outputBlob = await canvas.convertToBlob({ type: "image/jpeg", quality: 0.8 });
+  // Nén ảnh với quality thấp để giảm kích thước
+  const outputBlob = await canvas.convertToBlob({ type: "image/jpeg", quality: 0.4 });
   
   // Chuyển blob thành base64 không dùng FileReader (tương thích service worker)
   const arrayBuffer = await outputBlob.arrayBuffer();
@@ -1651,7 +1858,24 @@ async function annotateWithAI(dataUrl, report) {
   for (let i = 0; i < bytes.byteLength; i++) {
     binary += String.fromCharCode(bytes[i]);
   }
-  return btoa(binary);
+  const base64 = btoa(binary);
+  
+  // Kiểm tra kích thước và nén thêm nếu cần
+  if (base64.length > 500000) { // Nếu > 500KB
+    console.log(`📸 Annotated image too large (${base64.length} chars), compressing further...`);
+    const compressedBlob = await canvas.convertToBlob({ type: "image/jpeg", quality: 0.2 });
+    const compressedArrayBuffer = await compressedBlob.arrayBuffer();
+    const compressedBytes = new Uint8Array(compressedArrayBuffer);
+    let compressedBinary = '';
+    for (let i = 0; i < compressedBytes.byteLength; i++) {
+      compressedBinary += String.fromCharCode(compressedBytes[i]);
+    }
+    const compressedBase64 = btoa(compressedBinary);
+    console.log(`📸 Compressed annotated image: ${compressedBase64.length} chars`);
+    return compressedBase64;
+  }
+  
+  return base64;
 }
 
 // Lưu lịch sử (tối đa 50 entries để tránh quota)
@@ -1665,11 +1889,11 @@ async function pushHistory(entry) {
   });
   
   try {
-    const { [KEY]: list = [] } = await chrome.storage.local.get([KEY]);
+  const { [KEY]: list = [] } = await chrome.storage.local.get([KEY]);
     console.log('📊 Current history list length:', list.length);
     
     // Add entry to beginning of array
-    list.unshift(entry);
+  list.unshift(entry);
     const trimmedList = list.slice(0, 50); // Giảm xuống 50 để tránh quota
     
     // Save back to storage
@@ -1921,7 +2145,21 @@ Nếu trang web an toàn, hãy tạo ra 12 điểm tích cực hoặc các đặ
 Viết evidence_text như báo cáo chuyên gia (300+ từ) và technical_analysis chi tiết về cấu trúc trang. Recommendation phải cụ thể dựa trên full context của trang.`;
 }
 
-async function callGemini({ apiKey, model, imageBase64, context, endpointBase, urlSafetyData = null }) {
+async function callGemini({ model, imageBase64, context, endpointBase, urlSafetyData = null }) {
+  // Load keys nếu chưa có
+  if (geminiKeyManager.keys.length === 0) {
+    await geminiKeyManager.loadKeys();
+  }
+
+  // Lấy key tiếp theo theo thứ tự luân phiên
+  const apiKey = geminiKeyManager.getNextKey();
+  if (!apiKey) {
+    throw new Error("Không có API key khả dụng");
+  }
+
+  console.log(`🔑 Using API key: ${apiKey.substring(0, 10)}...`);
+
+  try {
   const endpoint =
     (endpointBase || "https://generativelanguage.googleapis.com") +
     `/v1beta/models/${encodeURIComponent(model || "gemini-2.0-flash")}:generateContent?key=${encodeURIComponent(apiKey)}`;
@@ -1930,13 +2168,13 @@ async function callGemini({ apiKey, model, imageBase64, context, endpointBase, u
     contents: [{
       role: "user",
       parts: [
-        { text: buildGeminiPrompt(context, urlSafetyData) },
+          { text: buildGeminiPrompt(context, urlSafetyData) },
         { inlineData: { mimeType: "image/png", data: imageBase64 } }
       ]
     }],
     generationConfig: {
       temperature: 0.1,
-      maxOutputTokens: 6000, // Tăng lên 6000 cho phân tích 12 findings chi tiết
+        maxOutputTokens: 6000, // Tăng lên 6000 cho phân tích 12 findings chi tiết
       responseMimeType: "application/json"
     }
   };
@@ -1946,9 +2184,19 @@ async function callGemini({ apiKey, model, imageBase64, context, endpointBase, u
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body)
   });
-  if (!res.ok) throw new Error(`Gemini HTTP ${res.status}: ${await res.text()}`);
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      throw new Error(`Gemini HTTP ${res.status}: ${errorText}`);
+    }
 
   const data = await res.json();
+    
+    // Kiểm tra lỗi từ Gemini API
+    if (data.error) {
+      throw new Error(`Gemini API Error: ${data.error.message || data.error}`);
+    }
+
   // Lấy text JSON từ candidates
   const txt =
     data?.candidates?.[0]?.content?.parts?.[0]?.text ??
@@ -1970,15 +2218,21 @@ async function callGemini({ apiKey, model, imageBase64, context, endpointBase, u
   report.risk = typeof report.risk === "number" ? Math.max(0, Math.min(10, report.risk)) : 7;
   report.summary = report.summary || "Có vẻ nguy hiểm";
   report.findings = Array.isArray(report.findings) ? report.findings : [];
-  report.evidence_text = report.evidence_text || "Cần phân tích thêm để đưa ra đánh giá chính xác.";
-  report.technical_analysis = report.technical_analysis || "Chưa có phân tích kỹ thuật chi tiết.";
-  report.recommendation = report.recommendation || "Hãy thận trọng khi sử dụng trang web này.";
-  report.website_category = report.website_category || "unknown";
-  report.threat_level = report.threat_level || (report.risk >= 8 ? "CRITICAL" : report.risk >= 6 ? "HIGH" : report.risk >= 4 ? "MEDIUM" : "LOW");
-  report.confidence_score = typeof report.confidence_score === "number" ? Math.max(0, Math.min(100, report.confidence_score)) : 85;
+    report.evidence_text = report.evidence_text || "Cần phân tích thêm để đưa ra đánh giá chính xác.";
+    report.technical_analysis = report.technical_analysis || "Chưa có phân tích kỹ thuật chi tiết.";
+    report.recommendation = report.recommendation || "Hãy thận trọng khi sử dụng trang web này.";
+    report.website_category = report.website_category || "unknown";
+    report.threat_level = report.threat_level || (report.risk >= 8 ? "CRITICAL" : report.risk >= 6 ? "HIGH" : report.risk >= 4 ? "MEDIUM" : "LOW");
+    report.confidence_score = typeof report.confidence_score === "number" ? Math.max(0, Math.min(100, report.confidence_score)) : 85;
   report.boxes = Array.isArray(report.boxes) ? report.boxes : [];
 
+    console.log(`✅ Gemini analysis successful with key ${apiKey.substring(0, 10)}...`);
   return report;
+
+  } catch (error) {
+    console.error(`❌ Gemini analysis failed with key ${apiKey.substring(0, 10)}...:`, error.message);
+    throw error;
+  }
 }
 
 // ===== Message router =====
@@ -1990,10 +2244,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
         const tabId = tab.id;
 
-        const { apiHeaders = {}, geminiApiKey, geminiModel, geminiEndpointBase } =
-          await chrome.storage.sync.get(["apiHeaders", "geminiApiKey", "geminiModel", "geminiEndpointBase"]);
+        const { apiHeaders = {}, geminiModel, geminiEndpointBase } =
+          await chrome.storage.sync.get(["apiHeaders", "geminiModel", "geminiEndpointBase"]);
 
-        if (!geminiApiKey) throw new Error("Chưa cấu hình Gemini API Key trong Options.");
+        // Load và kiểm tra API keys
+        await geminiKeyManager.loadKeys();
+        if (geminiKeyManager.keys.length === 0) {
+          throw new Error("Chưa cấu hình Gemini API Keys trong Options. Vui lòng thêm ít nhất 1 API key.");
+        }
 
         // 0) Kiểm tra an toàn URL và domain đã báo cáo trước khi quét (nếu không phải force scan)
         let urlSafetyData = null;
@@ -2056,7 +2314,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         // 2) Gọi Gemini phân tích chuyên sâu (im lặng)
         
         let aiReport = await callGemini({
-          apiKey: geminiApiKey,
           model: geminiModel || "gemini-2.0-flash",
           imageBase64: shotBase64,
           context: ctx,
@@ -2072,39 +2329,82 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         aiReport.domainReportData = domainReportData; // Lưu kết quả kiểm tra domain đã báo cáo
 
 
-        // 4) Upload ảnh viewport hiện tại (im lặng)
+        // 4) Upload ảnh viewport hiện tại với error handling mạnh mẽ
+        console.log('📤 Starting image uploads...');
         
-        const compressedCurrentView = await compressImage(currentViewDataUrl, 1200, 0.8);
-        const upCurrentView = await uploadImageJSON({
+        let upCurrentView = { success: false, error: 'Not attempted' };
+        let upFullPage = { success: false, error: 'Not attempted' };
+        let upAnnotated = { success: false, error: 'Not attempted' };
+        
+        try {
+          const compressedCurrentView = await compressImage(currentViewDataUrl, 1200, 0.8);
+          console.log(`📸 Compressed viewport: ${compressedCurrentView.length} chars`);
+          
+                  upCurrentView = await uploadImageJSON({
           base64: compressedCurrentView,
           filename: `viewport_${Date.now()}.jpg`,
           headers: apiHeaders
-        }).catch(e => ({ success: false, error: String(e) }));
+        });
+        } catch (e) {
+          console.error('❌ Viewport upload failed:', e);
+          upCurrentView = { success: false, error: String(e) };
+        }
 
-        // 5) Upload ảnh full page (im lặng)
-        
-        const compressedFullPage = await compressImage(fullPageDataUrl, 1200, 0.8);
-        const upFullPage = await uploadImageJSON({
-          base64: compressedFullPage,
-          filename: `fullpage_${Date.now()}.jpg`,
-          headers: apiHeaders
-        }).catch(e => ({ success: false, error: String(e) }));
+        // 5) Upload ảnh full page với error handling
+        try {
+          const compressedFullPage = await compressImage(fullPageDataUrl, 1200, 0.8);
+          console.log(`📸 Compressed fullpage: ${compressedFullPage.length} chars`);
+          
+          upFullPage = await uploadImageJSON({
+            base64: compressedFullPage,
+            filename: `fullpage_${Date.now()}.jpg`,
+            headers: apiHeaders
+          });
+        } catch (e) {
+          console.error('❌ Full page upload failed:', e);
+          upFullPage = { success: false, error: String(e) };
+        }
 
-        // 6) Vẽ chú thích và upload ảnh có chú thích (im lặng)
-        const annotatedB64 = await annotateWithAI(fullPageDataUrl, aiReport);
-        
-        const upAnnotated = await uploadImageJSON({
+        // 6) Vẽ chú thích và upload ảnh có chú thích
+        try {
+          const annotatedB64 = await annotateWithAI(fullPageDataUrl, aiReport);
+          console.log(`📸 Annotated image: ${annotatedB64.length} chars`);
+          
+          // Kiểm tra kích thước trước khi upload
+          if (annotatedB64.length > 800000) { // Nếu > 800KB
+            console.warn(`⚠️ Annotated image too large (${annotatedB64.length} chars), skipping upload`);
+            upAnnotated = { success: false, error: 'Image too large for upload' };
+          } else {
+            upAnnotated = await uploadImageJSON({
           base64: annotatedB64,
           filename: `evidence_annotated_${Date.now()}.jpg`,
           headers: apiHeaders
-        }).catch(e => ({ success: false, error: String(e) }));
+            });
+          }
+        } catch (e) {
+          console.error('❌ Annotated upload failed:', e);
+          upAnnotated = { success: false, error: String(e) };
+        }
+        
+        console.log('📊 Upload results:', {
+          viewport: upCurrentView.success ? '✅' : '❌',
+          fullpage: upFullPage.success ? '✅' : '❌', 
+          annotated: upAnnotated.success ? '✅' : '❌'
+        });
 
-        // 7) Tạo báo cáo cuối cùng
+        // 7) Tạo báo cáo cuối cùng với đảm bảo hình ảnh
         const uploadUrls = {
-          currentView: upCurrentView.success ? upCurrentView.link : upCurrentView.error,
-          fullPage: upFullPage.success ? upFullPage.link : upFullPage.error,
-          annotated: upAnnotated.success ? upAnnotated.link : upAnnotated.error
+          currentView: upCurrentView.success ? upCurrentView.link : 'Failed to upload',
+          fullPage: upFullPage.success ? upFullPage.link : 'Failed to upload',
+          annotated: upAnnotated.success ? upAnnotated.link : 'Failed to upload'
         };
+        
+        // Log upload status
+        console.log('📋 Final upload URLs:', {
+          currentView: uploadUrls.currentView,
+          fullPage: uploadUrls.fullPage,
+          annotated: uploadUrls.annotated
+        });
         
         const reportText = generateReportText(aiReport, uploadUrls);
         
@@ -2198,18 +2498,32 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         // Lấy email từ storage
         const { userEmail } = await chrome.storage.sync.get(['userEmail']);
         
-        // Tạo dữ liệu form
+        // Tạo dữ liệu form với đảm bảo hình ảnh
+        console.log('📋 Form data from reportData:', {
+          url: reportData.url,
+          uploads: reportData.uploads,
+          hasImages: !!(reportData.uploads?.currentView || reportData.uploads?.fullPage || reportData.uploads?.annotated)
+        });
+        
         const formData = {
           url: reportData.url || '',
           category: detectCategory(aiData),
           evidence: generateShortEvidence(aiData, reportData.url),
           email: userEmail || '',
           images: {
-            currentView: reportData.uploads?.currentView?.link || '',
-            fullPage: reportData.uploads?.fullPage?.link || '',
-            annotated: reportData.uploads?.annotated?.link || ''
+            currentView: reportData.uploads?.currentView || reportData.uploads?.currentView?.link || '',
+            fullPage: reportData.uploads?.fullPage || reportData.uploads?.fullPage?.link || '',
+            annotated: reportData.uploads?.annotated || reportData.uploads?.annotated?.link || ''
           }
         };
+        
+        // Log để debug
+        console.log('📤 Form data for auto-fill:', {
+          url: formData.url,
+          category: formData.category,
+          evidenceLength: formData.evidence.length,
+          images: formData.images
+        });
         
         // Mở tab ChongLuaDao với dữ liệu
         const formUrl = 'https://chongluadao.vn/report/reportphishing';
@@ -2313,32 +2627,48 @@ function fillChongLuaDaoForm(formData) {
         }
       }
       
-      // Thêm thông tin về 2 ảnh chính vào phần bằng chứng
-      if (formData.images && (formData.images.fullPage || formData.images.annotated)) {
-        let imageInfo = '\n\nHÌNH ẢNH BẰNG CHỨNG:';
-        
-        // Ưu tiên ảnh toàn trang và ảnh phân tích (2 ảnh quan trọng nhất)
-        if (formData.images.fullPage) {
-          imageInfo += `\n• Ảnh toàn trang: ${formData.images.fullPage}`;
-        }
-        if (formData.images.annotated) {
-          imageInfo += `\n• Ảnh có chú thích phân tích: ${formData.images.annotated}`;
-        }
-        
-        if (evidenceField) {
-          evidenceField.value += imageInfo;
-          evidenceField.dispatchEvent(new Event('change', { bubbles: true }));
-        }
+      // Thêm thông tin về hình ảnh bằng chứng vào phần bằng chứng
+      let imageInfo = '\n\nHÌNH ẢNH BẰNG CHỨNG:';
+      let imageCount = 0;
+      
+      // Thêm tất cả hình ảnh có sẵn
+      if (formData.images?.currentView && formData.images.currentView !== 'Failed to upload') {
+        imageInfo += `\n• Ảnh viewport: ${formData.images.currentView}`;
+        imageCount++;
+      }
+      if (formData.images?.fullPage && formData.images.fullPage !== 'Failed to upload') {
+        imageInfo += `\n• Ảnh toàn trang: ${formData.images.fullPage}`;
+        imageCount++;
+      }
+      if (formData.images?.annotated && formData.images.annotated !== 'Failed to upload') {
+        imageInfo += `\n• Ảnh có chú thích phân tích: ${formData.images.annotated}`;
+        imageCount++;
+      }
+      
+      // Nếu không có hình ảnh nào, thêm thông báo
+      if (imageCount === 0) {
+        imageInfo += '\n• Không có hình ảnh bằng chứng (lỗi upload)';
+      }
+      
+      if (evidenceField) {
+        evidenceField.value += imageInfo;
+        evidenceField.dispatchEvent(new Event('change', { bubbles: true }));
+        console.log(`📷 Added ${imageCount} images to evidence field`);
       }
 
-      // Hiển thị thông báo thành công với thông tin ảnh chính
-      const mainImages = [formData.images?.fullPage, formData.images?.annotated].filter(Boolean);
+      // Hiển thị thông báo thành công với thông tin ảnh chính xác
+      const allImages = [
+        formData.images?.currentView,
+        formData.images?.fullPage, 
+        formData.images?.annotated
+      ].filter(img => img && img !== 'Failed to upload');
+      
       const notification = document.createElement('div');
       notification.innerHTML = `
         <div style="position: fixed; top: 20px; right: 20px; background: #4CAF50; color: white; padding: 16px; border-radius: 8px; z-index: 9999; box-shadow: 0 4px 12px rgba(0,0,0,0.3); max-width: 340px;">
           <strong>✅ ChongLuaDao Extension</strong><br>
           Đã điền form với bằng chứng cụ thể!<br>
-          <small>📷 Gửi kèm ${mainImages.length} ảnh bằng chứng chính</small><br>
+          <small>📷 Gửi kèm ${allImages.length} ảnh bằng chứng</small><br>
           <small>🔍 Bằng chứng chi tiết đã được trích xuất</small><br>
           <small>Kiểm tra và submit khi sẵn sàng</small>
         </div>
