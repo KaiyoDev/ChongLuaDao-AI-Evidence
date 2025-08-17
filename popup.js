@@ -16,8 +16,8 @@ function updateConnectionStatus() {
   const statusDot = $('#connectionStatus .status-dot');
   
   // Check API configuration
-  chrome.storage.sync.get(['geminiApiKey'], (result) => {
-    if (result.geminiApiKey) {
+  chrome.storage.sync.get(['geminiApiKeys'], (result) => {
+    if (result.geminiApiKeys && result.geminiApiKeys.length > 0) {
       statusText.textContent = 'Sẵn sàng';
       statusDot.style.background = '#22c55e';
     } else {
@@ -83,9 +83,9 @@ async function runAnalysis(isFullPage = true) {
     return;
   }
 
-  // Check API key first
-  const apiConfig = await chrome.storage.sync.get(['geminiApiKey']);
-  if (!apiConfig.geminiApiKey) {
+  // Check API keys first
+  const apiConfig = await chrome.storage.sync.get(['geminiApiKeys']);
+  if (!apiConfig.geminiApiKeys || apiConfig.geminiApiKeys.length === 0) {
     // Mở trang cài đặt trực tiếp
     chrome.tabs.create({ url: chrome.runtime.getURL('options.html') });
     return;
@@ -101,7 +101,7 @@ async function runAnalysis(isFullPage = true) {
     
     const response = await chrome.runtime.sendMessage({ 
       type: "RUN_CAPTURE_AND_ANALYZE", 
-      fullPage: isFullPage
+      captureMode: isFullPage ? "FULL_PAGE" : "QUICK"
     });
     
     if (!response.ok) {
