@@ -167,7 +167,7 @@ async function displayResults(report) {
   $('#historyList').hidden = true;
   
   // Update risk badge
-  const aiData = report.ai || {};
+    const aiData = report.ai || {};
   updateRiskBadge(aiData.risk || 0);
   
   // Update summary
@@ -506,7 +506,7 @@ document.addEventListener('DOMContentLoaded', () => {
       reportData: currentReportData 
     });
       }
-    } catch (error) {
+  } catch (error) {
       console.error('Error filling form:', error);
     }
   });
