@@ -87,15 +87,17 @@ async function saveConfig() {
 
     // Validate required fields
     if (!config.geminiApiKey) {
-      showToast("❌ API Key là bắt buộc", "error");
+      showToast("❌ Gemini API Key là bắt buộc", "error");
       $('#geminiApiKey').focus();
       return;
     }
 
     // Validate API key format
     if (!config.geminiApiKey.startsWith('AIza')) {
-      showToast("⚠️ API Key không đúng định dạng (phải bắt đầu bằng 'AIza')", "warning");
+      showToast("⚠️ Gemini API Key không đúng định dạng (phải bắt đầu bằng 'AIza')", "warning");
     }
+
+
 
     // Validate JSON headers if provided
     if (config.apiHeaders) {
