@@ -2766,24 +2766,63 @@ function detectFakeSuccessStories(evidenceText, findings) {
   
   // Pattern rút tiền thành công
   const successPatterns = [
-    /rút.*?(\d+).*?(triệu|nghìn|k|tr)/,
-    /kiếm.*?(\d+).*?(triệu|nghìn|k|tr).*?(ngày|tuần|tháng)/,
-    /thu.*?(\d+).*?(triệu|nghìn|k|tr)/,
-    /lãi.*?(\d+).*?(triệu|nghìn|k|tr)/,
+    /rút.*?(\d+).*?(triệu|nghìn|k|tr|usd|đô|dollar|$)/,
+    /kiếm.*?(\d+).*?(triệu|nghìn|k|tr|usd|đô|dollar|$).*?(ngày|tuần|tháng|giờ|phút)/,
+    /thu.*?(\d+).*?(triệu|nghìn|k|tr|usd|đô|dollar|$)/,
+    /lãi.*?(\d+).*?(triệu|nghìn|k|tr|usd|đô|dollar|$)/,
     /thành công.*?rút.*?(\d+)/,
-    /đã.*?nhận.*?(\d+).*?(triệu|nghìn)/,
-    /nhận.*?(\d+).*?(triệu|nghìn|k|tr).*?(hôm nay|tuần này|tháng này)/,
-    /đầu tư.*?(\d+).*?(triệu|nghìn|k|tr).*?(lãi|lời)/,
-    /chốt.*?(\d+).*?(triệu|nghìn|k|tr).*?(lệnh|phiên)/
+    /đã.*?nhận.*?(\d+).*?(triệu|nghìn|k|tr|usd|đô|dollar|$)/,
+    /nhận.*?(\d+).*?(triệu|nghìn|k|tr|usd|đô|dollar|$).*?(hôm nay|tuần này|tháng này|ngày hôm nay|vừa xong|mới nhận)/,
+    /đầu tư.*?(\d+).*?(triệu|nghìn|k|tr|usd|đô|dollar|$).*?(lãi|lời|lợi nhuận|thắng)/,
+    /chốt.*?(\d+).*?(triệu|nghìn|k|tr|usd|đô|dollar|$).*?(lệnh|phiên|kèo|deal)/,
+    /rút tiền.*?(thành công|về ví|về tài khoản|về ngân hàng)/,
+    /chỉ.*?(\d+).*?(ngày|giờ|phút).*?kiếm.*?(\d+).*?(triệu|nghìn|k|tr|usd|đô|dollar|$)/,
+    /mỗi ngày.*?kiếm.*?(\d+).*?(triệu|nghìn|k|tr|usd|đô|dollar|$)/,
+    /tôi đã.*?(rút|kiếm|nhận|lãi).*?(\d+).*?(triệu|nghìn|k|tr|usd|đô|dollar|$)/,
+    /chỉ cần.*?(đầu tư|nạp|gửi).*?(\d+).*?(triệu|nghìn|k|tr|usd|đô|dollar|$).*?(nhận|lãi|kiếm).*?(\d+).*?(triệu|nghìn|k|tr|usd|đô|dollar|$)/,
+    /rút.*?(về ví|về tài khoản|về ngân hàng).*?(\d+).*?(triệu|nghìn|k|tr|usd|đô|dollar|$)/,
+    /chỉ trong.*?(\d+).*?(giờ|phút|ngày).*?đã.*?(rút|kiếm|nhận).*?(\d+).*?(triệu|nghìn|k|tr|usd|đô|dollar|$)/,
+    /lợi nhuận.*?(\d+).*?(triệu|nghìn|k|tr|usd|đô|dollar|$)/,
+    /rút.*?(\d+).*?(lần|phiên|ngày)/,
+    /rút.*?(\d+).*?(lần).*?liên tục/,
+    /rút.*?(\d+).*?(giây|phút|giờ)/,
+    /rút.*?(\d+).*?(usd|đô|dollar|$)/,
+    /kiếm.*?(\d+).*?(usd|đô|dollar|$)/,
+    /lãi.*?(\d+).*?(usd|đô|dollar|$)/,
+    /nhận.*?(\d+).*?(usd|đô|dollar|$)/,
+    /chỉ cần.*?(\d+).*?(ngày|giờ|phút).*?có.*?(\d+).*?(triệu|nghìn|k|tr|usd|đô|dollar|$)/,
+    /rút.*?(\d+).*?(triệu|nghìn|k|tr|usd|đô|dollar|$).*?(mỗi ngày|mỗi tuần|mỗi tháng)/,
+    /rút.*?(\d+).*?(triệu|nghìn|k|tr|usd|đô|dollar|$).*?(liên tục|liên tiếp)/,
+    /rút.*?(\d+).*?(triệu|nghìn|k|tr|usd|đô|dollar|$).*?(chỉ trong|trong vòng).*?(\d+).*?(giờ|phút|ngày)/,
+    /rút.*?(\d+).*?(triệu|nghìn|k|tr|usd|đô|dollar|$).*?(vừa xong|mới đây|ngay lập tức)/,
+    /rút.*?(\d+).*?(triệu|nghìn|k|tr|usd|đô|dollar|$).*?(tự động|auto)/,
+    /rút.*?(\d+).*?(triệu|nghìn|k|tr|usd|đô|dollar|$).*?(không cần xác minh|không cần chờ)/,
+    /rút.*?(\d+).*?(triệu|nghìn|k|tr|usd|đô|dollar|$).*?(không giới hạn|không hạn mức)/,
+    /rút.*?(\d+).*?(triệu|nghìn|k|tr|usd|đô|dollar|$).*?(bất cứ lúc nào|mọi lúc mọi nơi)/,
+    /rút.*?(\d+).*?(triệu|nghìn|k|tr|usd|đô|dollar|$).*?(không mất phí|miễn phí)/,
+    /rút.*?(\d+).*?(triệu|nghìn|k|tr|usd|đô|dollar|$).*?(siêu tốc|nhanh chóng|chỉ 1 phút|chỉ 5 phút)/,
+    /rút.*?(\d+).*?(triệu|nghìn|k|tr|usd|đô|dollar|$).*?(không cần vốn|không cần đầu tư)/,
+    /rút.*?(\d+).*?(triệu|nghìn|k|tr|usd|đô|dollar|$).*?(ai cũng làm được|dễ dàng|đơn giản)/,
   ];
-  
+
   const testimonialKeywords = [
     'chị mai', 'anh nam', 'chị hoa', 'anh tuấn', 'chị lan',
     'bà nga', 'cô linh', 'thầy minh', 'chú hùng', 'em trang',
     'khách hàng', 'thành viên', 'user', 'trader', 'nhà đầu tư',
     'anh thắng', 'chị thảo', 'anh phong', 'chị ngọc', 'anh quân',
     'chị hương', 'anh dũng', 'chị linh', 'anh minh', 'chị hà',
-    'người chơi', 'thành viên vip', 'cao thủ', 'chuyên gia', 'người thắng lớn'
+    'người chơi', 'thành viên vip', 'cao thủ', 'chuyên gia', 'người thắng lớn',
+    'bạn tôi', 'bạn mình', 'bạn thân', 'bạn học', 'bạn đồng nghiệp',
+    'bạn hàng xóm', 'bạn cùng phòng', 'bạn cùng lớp', 'bạn cùng công ty',
+    'bạn cũ', 'bạn mới', 'bạn gái', 'bạn trai', 'bạn thân thiết',
+    'chị hàng xóm', 'anh hàng xóm', 'chị đồng nghiệp', 'anh đồng nghiệp',
+    'chị bạn', 'anh bạn', 'chị em', 'anh em', 'bạn bè', 'người thân',
+    'bạn facebook', 'bạn zalo', 'bạn tiktok', 'bạn instagram',
+    'bạn trên mạng', 'bạn online', 'bạn ảo', 'bạn thật', 'bạn ngoài đời',
+    'chị khách', 'anh khách', 'chị trader', 'anh trader', 'chị nhà đầu tư', 'anh nhà đầu tư',
+    'chị chuyên gia', 'anh chuyên gia', 'chị cao thủ', 'anh cao thủ',
+    'chị thành viên vip', 'anh thành viên vip', 'chị người chơi', 'anh người chơi',
+    'chị người thắng lớn', 'anh người thắng lớn'
   ];
   
   let hasSuccessPattern = false;
@@ -2806,16 +2845,32 @@ function detectFakeSuccessStories(evidenceText, findings) {
   }
   
   if (hasSuccessPattern && hasTestimonial) {
-    return "Sử dụng câu chuyện rút tiền thành công giả mạo với số tiền lớn để tạo lòng tin";
+    return "Sử dụng câu chuyện rút tiền thành công giả mạo với số tiền lớn để tạo lòng tin, thường kèm tên người thật hoặc khách hàng cụ thể để tăng độ tin cậy.";
   }
-  
+
   if (hasSuccessPattern) {
-    return "Quảng cáo số tiền kiếm được/rút được bất thường để thu hút người dùng";
+    // Thêm nhiều trường hợp hơn cho các kiểu quảng cáo số tiền bất thường
+    if (allText.match(/(rút|kiếm|nhận|lãi|chốt).*?(tỷ|tỉ|trăm triệu|trăm nghìn|trăm k|trăm tr)/)) {
+      return "Quảng cáo số tiền cực lớn (tỷ, trăm triệu) để gây ấn tượng mạnh và thu hút người dùng nhẹ dạ.";
+    }
+    if (allText.match(/(rút|kiếm|nhận|lãi|chốt).*?(usd|đô|dollar|$)/)) {
+      return "Quảng cáo số tiền kiếm được/rút được bằng ngoại tệ (USD, đô) để tạo cảm giác quốc tế, chuyên nghiệp.";
+    }
+    return "Quảng cáo số tiền kiếm được/rút được bất thường để thu hút người dùng, có thể là số tiền nhỏ lặp lại nhiều lần hoặc số tiền lớn bất hợp lý.";
   }
-  
-  // Pattern screenshot bank/ví điện tử
-  if (allText.match(/(screenshot|ảnh chụp|hình.*?(chuyển khoản|rút tiền|số dư)|bank.*?statement)/)) {
-    return "Hiển thị ảnh chụp màn hình giao dịch/số dư có thể bị chỉnh sửa để làm bằng chứng giả";
+
+  // Pattern screenshot bank/ví điện tử, bổ sung thêm các trường hợp phổ biến
+  if (
+    allText.match(/(screenshot|ảnh chụp|hình.*?(chuyển khoản|rút tiền|số dư)|bank.*?statement|biên lai|bill|lịch sử giao dịch|momo|zalopay|vietcombank|acb|techcombank|vpbank|mbbank|agribank|số tài khoản|mã giao dịch|transaction id|transaction code)/)
+  ) {
+    return "Hiển thị ảnh chụp màn hình giao dịch/số dư, biên lai chuyển khoản, hoặc lịch sử giao dịch ngân hàng/ví điện tử có thể bị chỉnh sửa để làm bằng chứng giả.";
+  }
+
+  // Thêm trường hợp: video/quay màn hình giao dịch giả
+  if (
+    allText.match(/(video|clip|quay màn hình|livestream).*?(chuyển khoản|rút tiền|nhận tiền|giao dịch)/)
+  ) {
+    return "Sử dụng video hoặc quay màn hình giao dịch giả để tăng độ tin cậy cho quảng cáo lừa đảo.";
   }
   
   return null;
@@ -2833,14 +2888,58 @@ function detectFakeNewsEndorsements(evidenceText, summary) {
     'kenh14', 'kênh 14', 'báo mới', 'bao moi', 'news', 'tin tức',
     'café land', 'cafeland', 'eva', 'afamily', 'doisongphapluat',
     'người lao động', 'nguoi lao dong', 'lao động', 'lao dong',
-    'infonet', 'info net', 'soha', 'genk', 'tinhte', 'tinhte.vn'
+    'infonet', 'info net', 'soha', 'genk', 'tinhte', 'tinhte.vn',
+    'vnmedia', 'báo pháp luật', 'pháp luật', 'phap luat', 'plo', 'plo.vn',
+    'báo công an', 'công an nhân dân', 'cand', 'cand.com.vn',
+    'báo an ninh thủ đô', 'an ninh thủ đô', 'anninhthudo', 'anninhthudo.vn',
+    'báo giao thông', 'giao thông', 'baogiaothong', 'baogiaothong.vn',
+    'báo điện tử', 'báo điện tử vov', 'vov', 'vov.vn',
+    'báo đầu tư', 'báo đầu tư chứng khoán', 'baodautu', 'baodautu.vn',
+    'báo tài chính', 'tài chính', 'thoibaotaichinh', 'thoibaotaichinhvietnam.vn',
+    'báo sức khỏe', 'sức khỏe đời sống', 'suckhoedoisong', 'suckhoedoisong.vn',
+    'báo pháp luật tp.hcm', 'pháp luật tp.hcm', 'plo hcm', 'plo.com.vn',
+    'báo tuổi trẻ thủ đô', 'tuổi trẻ thủ đô', 'tuoitrethudo', 'tuoitrethudo.com.vn',
+    'báo dân việt', 'dân việt', 'danviet', 'danviet.vn',
+    'báo nông nghiệp', 'nông nghiệp', 'nongnghiep', 'nongnghiep.vn',
+    'báo công thương', 'công thương', 'congthuong', 'congthuong.vn',
+    'báo điện tử dân sinh', 'dân sinh', 'baodansinh', 'baodansinh.vn',
+    'báo pháp luật việt nam', 'pháp luật việt nam', 'baophapluat', 'baophapluat.vn',
+    'báo đời sống & pháp luật', 'đời sống & pháp luật', 'doisongphapluat', 'doisongphapluat.vn',
+    'báo người đưa tin', 'người đưa tin', 'nguoiduatin', 'nguoiduatin.vn',
+    'báo điện tử vietnamplus', 'vietnamplus', 'vietnamplus.vn',
+    'báo điện tử petrotimes', 'petrotimes', 'petrotimes.vn',
+    'báo điện tử dân trí', 'dân trí', 'dantri', 'dantri.com.vn',
+    'báo điện tử cafef', 'cafef', 'cafef.vn',
+    'báo điện tử vietbao', 'vietbao', 'vietbao.vn',
+    'báo điện tử viettimes', 'viettimes', 'viettimes.vn',
+    'báo điện tử ictnews', 'ictnews', 'ictnews.vn',
+    'báo điện tử baomoi', 'baomoi', 'baomoi.com',
+    'báo điện tử laodong', 'laodong', 'laodong.vn',
+    'báo điện tử nld', 'nld', 'nld.com.vn',
+    'báo điện tử thanhnien', 'thanhnien', 'thanhnien.vn',
+    'báo điện tử tuoitre', 'tuoitre', 'tuoitre.vn',
+    'báo điện tử zingnews', 'zingnews', 'zingnews.vn',
+    'báo điện tử kenh14', 'kenh14', 'kenh14.vn',
+    'báo điện tử soha', 'soha', 'soha.vn',
+    'báo điện tử genk', 'genk', 'genk.vn',
+    'báo điện tử tinhte', 'tinhte', 'tinhte.vn',
+    'báo điện tử cafebiz', 'cafebiz', 'cafebiz.vn',
+    'báo điện tử eva', 'eva', 'eva.vn',
+    'báo điện tử afamily', 'afamily', 'afamily.vn',
+    'báo điện tử doisongphapluat', 'doisongphapluat', 'doisongphapluat.vn'
   ];
   
   // Từ khóa đưa tin
   const newsKeywords = [
     'đưa tin', 'báo cáo', 'thông tin', 'xác nhận', 'phản ánh',
     'tiết lộ', 'bộc bạch', 'chia sẻ', 'phỏng vấn', 'tường thuật',
-    'điều tra', 'khám phá', 'phát hiện', 'bất ngờ'
+    'điều tra', 'khám phá', 'phát hiện', 'bất ngờ',
+    'độc quyền', 'lên sóng', 'được đăng tải', 'được phát sóng',
+    'được truyền hình', 'được báo chí', 'được truyền thông',
+    'được xác thực', 'được kiểm chứng', 'được kiểm tra', 'được chứng thực',
+    'được công nhận', 'được giới thiệu', 'được quảng bá', 'được đưa lên báo',
+    'được lên báo', 'được lên truyền hình', 'được lên sóng truyền hình',
+    'được lên sóng vtv', 'được lên sóng vtc', 'được lên sóng vnexpress'
   ];
   
   // Kiểm tra mạo danh báo chí
