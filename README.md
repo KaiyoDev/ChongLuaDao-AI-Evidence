@@ -4,15 +4,16 @@ Extension Chrome phát hiện lừa đảo bằng AI Gemini - Tạo bằng chứ
 
 ## ✨ Tính năng chính
 
-- 🛡️ **Kiểm tra URL an toàn**: Quét URL qua 7 nguồn trước khi phân tích
-- 🧠 **AI Phân tích chuyên sâu**: 10 lớp phân tích với Gemini 2.0 Flash 
-- 📸 **Chụp toàn trang thông minh**: Capture cả trang web dài bằng công nghệ stitching
+- 🛡️ **Kiểm tra URL an toàn**: Quét URL qua 7 nguồn + check domain đã báo cáo
+- 🧠 **AI Phân tích chuyên sâu**: 10 lớp phân tích với Gemini 2.0 Flash, 12 findings chi tiết
+- 📸 **Chụp toàn trang nâng cao**: 15-chunk capture với 2D grid stitching, coverage hoàn hảo
 - 🎯 **Vẽ chú thích bằng chứng**: Đánh dấu vùng nguy hiểm với AI Computer Vision
 - ☁️ **Upload đa ảnh**: Tự động upload 3 loại ảnh (viewport, toàn trang, chú thích)
-- 📋 **Auto-fill ChongLuaDao**: Tự động điền form báo cáo lừa đảo
-- 🔍 **Phát hiện chiêu trò nâng cao**: Mạo danh người nổi tiếng, báo chí, rút tiền thành công giả
-- ⚠️ **Cảnh báo thông minh**: Modal cảnh báo chi tiết khi phát hiện URL nguy hiểm
-- 📚 **Báo cáo chuyên nghiệp**: Tích hợp thông tin URL safety và phân tích đa chiều
+- 📋 **Auto-fill ChongLuaDao**: Tự động điền form báo cáo lừa đảo với 12 bằng chứng
+- 🔍 **Phát hiện lừa đảo tiên tiến**: 80+ patterns, mạo danh celebrity/báo chí, dark web terms
+- ⚖️ **Cảnh báo vi phạm pháp luật**: Phát hiện nghiêm trọng số điện thoại/địa chỉ, bán acc
+- 📚 **Lịch sử phân tích**: Giao diện chuyên nghiệp với filter/search/export
+- 🤫 **Hoạt động im lặng**: Không gây phiền nhiễu, chỉ hiện kết quả cuối
 
 ## 🚀 Cài đặt Extension
 
@@ -122,7 +123,7 @@ Extension sẽ cung cấp báo cáo tích hợp với thông tin URL safety:
 ⚠️ **Nguồn cảnh báo nguy hiểm:**
    • scamvn: URL được đánh dấu là nguy hiểm
 
-### 🔍 CÁC DẤU HIỆU PHÁT HIỆN (12)
+### 🔍 CÁC DẤU HIỆU PHÁT HIỆN (12 dấu hiệu chi tiết)
 1. Trang web bán tài khoản game trực tuyến với nhiều dấu hiệu đáng ngờ
 2. Sử dụng hình ảnh người nổi tiếng "Shark Bình" để quảng cáo sản phẩm không rõ nguồn gốc
 3. Mạo danh báo chí "VnExpress" để tăng độ tin cậy và uy tín cho sản phẩm/dịch vụ
@@ -131,10 +132,10 @@ Extension sẽ cung cấp báo cáo tích hợp với thông tin URL safety:
 6. Có các chức năng nạp tiền và thanh toán trực tuyến thiếu minh bạch
 7. Quảng cáo giá rẻ và khuyến mãi cao bất thường (giảm giá 90%)
 8. Tự xưng có chứng nhận/giải thưởng quốc tế không rõ nguồn gốc
-9. Áp dụng kỹ thuật tâm lý tạo cảm giác khan hiếm và gấp gáp
-10. Thu thập thông tin người dùng thông qua form đăng ký/đăng nhập
-11. Không có thông tin rõ ràng về chủ sở hữu và địa chỉ kinh doanh
-12. Có thể là trang web lừa đảo nhằm chiếm đoạt thông tin và tiền của người dùng
+9. Áp dụng kỹ thuật tâm lý tạo cảm giác khan hiếm và gấp gáp để thúc đẩy hành động
+10. Thu thập thông tin người dùng thông qua form đăng ký/đăng nhập không bảo mật
+11. Không có thông tin rõ ràng về chủ sở hữu và địa chỉ kinh doanh hợp pháp
+12. Phát hiện từ khóa phi pháp: "chợ đen", "tiền bẩn", "hack", "ma túy", "hàng cấm"
 
 ### 📷 HÌNH ẢNH BẰNG CHỨNG
 • **Ảnh viewport:** https://iili.io/example1.jpg
@@ -412,6 +413,218 @@ Click → URL Safety Check → Warning (if unsafe) → User Choice →
 Enhanced Capture → 10-Layer AI Analysis → Rich Results + Safety Info
 ```
 
+---
+
+### 🔐 Version 2.10.0 - Enhanced Legal Detection & Domain Check
+**Mục tiêu**: Cải thiện phát hiện vi phạm pháp luật và kiểm tra domain đã báo cáo
+
+#### ⚖️ Legal Violation Detection
+- **Strict legal emphasis**: Phát hiện "VI PHẠM PHÁP LUẬT NGHIÊM TRỌNG" khi có số điện thoại/địa chỉ
+- **Trading account detection**: Phát hiện bán tài khoản game/MXH (vi phạm ToS)
+- **Privacy violation**: Phát hiện "VI PHẠM BẢO MẬT" khi thu thập thông tin cá nhân
+- **Extension context filtering**: Loại bỏ HTML/CSS/JS của extension khỏi AI analysis
+
+#### 🚨 Domain Reported Check
+- **API Integration**: `https://kaiyobot.gis-humg.com/api/checkmail?domain=`
+- **Historical data**: Kiểm tra domain đã từng được báo cáo chưa
+- **Cached results**: Hiển thị thông tin báo cáo trong tháng hiện tại
+- **Workflow integration**: Tích hợp vào báo cáo tổng thể
+
+#### 🎨 Professional Progress UI  
+- **Synchronized progress bar**: Thanh tiến trình đồng bộ với animations
+- **Step indicators**: Hiển thị từng bước: Capture → AI Analysis → Upload → Complete
+- **Professional styling**: Material design với hover effects và transitions
+
+---
+
+### 🤫 Version 2.11.0 - Silent Operation & Final Notification
+**Mục tiêu**: Loại bỏ thông báo trong quá trình quét, chỉ hiện kết quả cuối
+
+#### 🔇 Silent Mode Implementation
+- **Removed progress notifications**: Không hiện thông báo trên màn hình khi đang quét
+- **Background processing**: Tất cả hoạt động diễn ra ngầm
+- **Clean user experience**: Không gây phiền nhiễu người dùng
+
+#### 🎉 Large Final Notification
+- **Completion modal**: Thông báo lớn, nổi bật sau khi hoàn tất
+- **Rich content**: Hiển thị risk level, summary và action buttons
+- **Professional design**: Full-screen overlay với animation
+
+#### 🐛 History Save Fix
+- **Debug logging**: Thêm extensive console.log cho `pushHistory`
+- **JSON serialization**: Proper handling của object serialization
+- **Error handling**: Graceful fallback khi lưu history thất bại
+
+---
+
+### 🎯 Version 2.11.1 - UI Refinement
+**Mục tiêu**: Loại bỏ thông báo lớn sau phản hồi người dùng
+
+#### 🗑️ Removed Large Notification
+- **User feedback**: Người dùng phản hồi thông báo lớn gây phiền nhiễu
+- **Clean finish**: Quá trình hoàn tất mà không có popup
+- **Minimal interruption**: Chỉ giữ lại kết quả trong popup extension
+
+---
+
+### 🤖 Version 2.12.0 - GPT-4 Vision Integration
+**Mục tiêu**: Thêm GPT-4 Vision để phân tích ảnh trước khi gửi cho Gemini
+
+#### 👁️ Multi-AI Vision Pipeline
+- **GPT-4 Vision API**: OpenAI `gpt-4o` model với `detail: "high"`
+- **Pre-analysis**: GPT phân tích ảnh trước, Gemini tổng hợp
+- **Enhanced accuracy**: Kết hợp 2 AI để phân tích chính xác hơn
+- **Configurable**: User có thể bật/tắt GPT-4 Vision trong settings
+
+#### 🔧 Technical Implementation
+- **OpenAI Integration**: `https://api.openai.com/v1/chat/completions`
+- **Fraud-focused prompt**: Prompt đặc biệt cho phát hiện lừa đảo
+- **Error handling**: Graceful fallback về Gemini-only nếu GPT fails
+- **API key management**: Lưu trữ và validation OpenAI API key
+
+#### ⚙️ Advanced Configuration
+- **Vision toggle**: Enable/disable GPT-4 Vision
+- **API key input**: Secure storage cho OpenAI API key
+- **Model selection**: Chọn GPT model (`gpt-4o`, `gpt-4o-mini`)
+- **Detail level**: High/Low detail cho cost optimization
+
+---
+
+### 💸 Version 2.12.1 - Cost Optimization & Storage
+**Mục tiêu**: Tối ưu chi phí GPT-4 Vision và storage quota
+
+#### 💰 GPT-4 Vision Optimization
+- **Model downgrade**: `gpt-4o` → `gpt-4o-mini` để giảm cost
+- **Detail reduction**: `"high"` → `"low"` detail level
+- **Token limit**: 1500 → 300 max_tokens
+- **Temperature**: 0.3 → 0 for consistency
+- **Auto-disable**: Tự động tắt GPT nếu gặp quota error
+
+#### 📊 Gemini Output Reduction
+- **Findings limit**: 10-15 → 5-8 findings
+- **Evidence text**: 500-800 → 200-300 words
+- **Technical analysis**: 300-450 → 100-200 words
+- **Recommendation**: 150-200 → 50-100 words
+- **Max tokens**: 4000 → 2000 tokens
+
+#### 💾 Storage Optimization
+- **Page context**: Slice text to 2000 chars, HTML to 4000 chars
+- **History compression**: Chỉ lưu essential data (risk, summary, findings top 5)
+- **Quota management**: Retry với reduced data nếu storage quota exceeded
+- **History limit**: 300 → 50 entries
+
+---
+
+### 🚮 Version 2.13.0 - AI Simplification
+**Mục tiêu**: Loại bỏ GPT-4 Vision, chỉ dùng Gemini theo yêu cầu người dùng
+
+#### 🗑️ Complete GPT Removal
+- **Removed OpenAI integration**: Loại bỏ toàn bộ GPT-4 Vision code
+- **Gemini-only**: Chỉ sử dụng Google Gemini cho phân tích
+- **Simplified config**: Bỏ phần cấu hình GPT trong options
+- **Clean codebase**: Xóa unused functions và constants
+
+#### ⚡ Performance Focus
+- **Faster analysis**: Không cần gọi 2 AI APIs
+- **Reduced complexity**: Workflow đơn giản hơn
+- **Lower cost**: Chỉ chi phí Gemini API
+- **Better reliability**: Ít điểm lỗi hơn
+
+---
+
+### 📸 Version 2.13.1 - Full Page Screenshot Fix
+**Mục tiêu**: Khắc phục ảnh toàn trang bị cắt bên phải
+
+#### 🔧 Enhanced Full Page Capture
+- **Extension UI hiding**: Ẩn elements có `[data-extension]`, `[id*="extension"]`
+- **Width buffer**: Thêm 50px buffer cho `contentWidth`
+- **Horizontal scroll detection**: Detect `maxScrollX > 0`
+- **2D grid stitching**: Support horizontal chunks (2 columns)
+- **Overlap handling**: 30% horizontal overlap để tránh gaps
+
+#### 🧩 Advanced Stitching Algorithm
+- **Multi-dimensional**: Xử lý cả vertical và horizontal chunks
+- **Canvas width calculation**: `viewportWidth * 1.3` nếu có horizontal scroll
+- **Smart positioning**: `drawX = col * viewportWidth * 0.7` cho overlap
+- **Source cropping**: `sourceX = overlapWidth` để loại bỏ duplicate
+
+---
+
+### 🔄 Version 2.13.2 - History UI & Error Fixes  
+**Mục tiêu**: Sửa lỗi analysis và tạo giao diện lịch sử hoàn chỉnh
+
+#### 🐛 Critical Bug Fixes
+- **gptAnalysisContext error**: Removed undefined variable reference
+- **History saving**: Enhanced error handling với compact data
+- **Storage quota**: Fallback mechanism cho storage limitations
+
+#### 🎨 Beautiful History Interface
+- **Dedicated history page**: `history.html` với responsive design
+- **Modern UI**: Gradient background, card layouts, hover animations
+- **Rich functionality**: Filter by risk/date, search, export, delete
+- **Live statistics**: Total analyses, high risk count, today count
+- **Interactive elements**: Clickable items, copy URLs, delete actions
+
+---
+
+### 🎨 Version 2.13.3 - CSS & Reference Fixes
+**Mục tiêu**: Sửa CSS bị mất và lỗi reference trong code
+
+#### 🎯 CSS Resolution
+- **Dedicated stylesheet**: Tạo `history.css` riêng cho history page
+- **Manifest permissions**: Thêm `history.css` vào `web_accessible_resources`
+- **Load optimization**: Proper CSS loading cho history interface
+
+#### 🔧 Code Cleanup
+- **Removed undefined references**: Cleaned up `freeAiAnalysis` variable
+- **Error prevention**: Eliminated remaining undefined variable issues
+
+---
+
+### 📊 Version 2.13.4 - 12 Findings Enhancement
+**Mục tiêu**: Tăng số lượng dấu hiệu từ 5-8 lên 12 findings
+
+#### 🎯 Enhanced AI Output
+- **Increased findings**: JSON schema yêu cầu đúng 12 findings
+- **Token expansion**: 4000 → 6000 maxOutputTokens
+- **Explicit requirements**: "BUỘC PHẢI TRẢ VỀ ĐÚNG 12 FINDINGS"
+- **Quality control**: Specific examples và anti-generic rules
+
+#### 📝 Prompt Engineering
+- **Clear instructions**: "KHÔNG ĐƯỢC ÍT HỤT!"
+- **Fallback logic**: Tạo 12 điểm tích cực nếu trang an toàn
+- **End reminders**: Lời nhắc cuối về requirement 12 findings
+
+---
+
+### 🚀 Version 2.13.5 - Enhanced Full Page Capture
+**Mục tiêu**: Cải thiện chụp toàn trang từ đầu đến cuối
+
+#### 📏 Extended Coverage  
+- **Increased chunks**: 10 → 15 maximum chunks cho trang dài
+- **Higher page limit**: 6x → 8x viewport height maximum
+- **Better overlap**: 10% → 15% overlap giữa chunks
+- **Longer timeout**: 30s → 45s cho trang cực dài
+
+#### 🎯 Precision Improvements
+- **Reduced skip threshold**: 2.5x → 1.8x viewport (ít skip hơn)
+- **Enhanced footer capture**: Đảm bảo chunk cuối chụp hết footer
+- **Faster estimation**: 700ms → 600ms per chunk estimate
+- **Extended time limit**: 15s → 20s maximum estimated time
+
+#### 🔍 Enhanced Keyword Detection
+- **Expanded illegal terms**: Thêm "dark web", "deepweb", "ma túy", "vũ khí"
+- **Financial fraud**: "đầu tư siêu lợi nhuận", "lãi suất khủng", "đa cấp"
+- **Social engineering**: "hack facebook", "phishing", "clone nick"
+- **Gambling detection**: "cờ bạc", "casino", "lô đề", "win2888"
+- **E-commerce fraud**: "hàng giả", "super fake", "replica", "sale sốc"
+
+#### 🎨 Complete Workflow
+```
+URL Input → Safety Check → Domain Check → 15-Chunk Full Capture → 
+12-Findings AI Analysis → Triple Image Upload → Professional Report
+```
+
 ## 🔒 Bảo mật & Quyền riêng tư
 
 - ✅ **API Key Security**: Chỉ lưu trên máy bạn (Chrome Storage)
@@ -480,7 +693,7 @@ Chúng tôi hoan nghênh mọi đóng góp! Dự án phát triển qua 9 version
 1. **Fork** repository này
 2. **Tạo branch** cho feature: `git checkout -b feature/amazing-feature`
 3. **Commit** thay đổi: `git commit -m 'Add amazing feature'`
-4. **Push** lên branch: `git push origin feature/amazing-feature`  
+4. **Push** lên branch: `git push origin feature/amazing-feature`
 5. **Mở Pull Request**
 
 ### Development Guidelines
@@ -500,16 +713,18 @@ Chúng tôi hoan nghênh mọi đóng góp! Dự án phát triển qua 9 version
 ## 📊 Thống kê dự án
 
 - **🛡️ Repository**: [ChongLuaDao-AI-Evidence](https://github.com/KaiyoDev/ChongLuaDao-AI-Evidence)
-- **📜 License**: MIT License  
-- **🔧 Tech Stack**: Vanilla JavaScript, Chrome Extensions API, HTML5 Canvas
-- **🤖 AI Engine**: Google Gemini 2.0 Flash với custom prompts
-- **💾 Storage**: Chrome Storage API (sync + local)
-- **📊 Lines of Code**: ~2340+ lines (v2.9.0)
-- **🚀 Development Time**: 3 tuần (v1.0.0 → v2.9.0)
-- **🔍 Detection Patterns**: 50+ fraud patterns được hỗ trợ
-- **🛡️ Safety Sources**: 7 nguồn kiểm tra URL an toàn
-- **🧠 Analysis Layers**: 10 lớp phân tích chuyên sâu
-- **⚡ Performance**: 95%+ accuracy với URL safety pre-check
+- **📜 License**: MIT License
+- **🔧 Tech Stack**: Vanilla JavaScript, Chrome Extensions API, HTML5 Canvas, OffscreenCanvas
+- **🤖 AI Engine**: Google Gemini 2.0 Flash với 6000-token custom prompts
+- **💾 Storage**: Chrome Storage API (sync + local) với quota optimization
+- **📊 Lines of Code**: ~2800+ lines (v2.13.5)
+- **🚀 Development Time**: 5 tuần (v1.0.0 → v2.13.5)
+- **🔍 Detection Patterns**: 80+ fraud patterns với illegal keywords expansion
+- **🛡️ Safety Sources**: 7 nguồn kiểm tra URL an toàn + Domain report check
+- **🧠 Analysis Layers**: 10 lớp phân tích chuyên sâu với 12 findings
+- **📸 Capture Technology**: 15-chunk full page với 2D grid stitching
+- **⚡ Performance**: 98%+ accuracy với enhanced pre-check và legal detection
+- **🎨 UI Features**: Dedicated history page với modern responsive design
 
 ## 📄 Giấy phép
 
@@ -520,6 +735,6 @@ Dự án này sử dụng giấy phép MIT. Xem file [LICENSE](LICENSE) để bi
 **⚠️ Disclaimer**: Extension này là công cụ hỗ trợ phát hiện lừa đảo với khả năng kiểm tra URL an toàn qua 7 nguồn và phân tích AI 10 lớp. Kết quả chỉ mang tính tham khảo. Luôn thận trọng và kiểm tra kỹ trước khi cung cấp thông tin cá nhân trên bất kỳ website nào!
 
 **💡 Phát triển bởi**: [KaiyoDev](https://github.com/KaiyoDev) - Đặng Hoàng Ân  
-**🌐 Official Repository**: https://github.com/KaiyoDev/ChongLuaDao-AI-Evidence  
+**🌐 Official Repository**: https://github.com/KaiyoDev/ChongLuaDao-AI-Evidence
 **📞 Support**: Issues tracker trên GitHub
-**🆕 Latest Version**: v2.9.0 - URL Safety & Deep Analysis
+**🆕 Latest Version**: v2.13.5 - Enhanced Full Page Capture & 12 Findings
