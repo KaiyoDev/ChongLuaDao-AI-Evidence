@@ -58,7 +58,8 @@ async function loadConfig() {
       'geminiModel',
       'geminiEndpointBase',
       'userEmail',
-      'apiHeaders'
+      'apiHeaders',
+      'autoCheckUrl'
     ]);
 
     // Convert array to textarea format
@@ -68,6 +69,7 @@ async function loadConfig() {
     $('#geminiEndpointBase').value = config.geminiEndpointBase || '';
     $('#userEmail').value = config.userEmail || '';
     $('#apiHeaders').value = config.apiHeaders || '';
+    $('#autoCheckUrl').checked = config.autoCheckUrl || false;
     
     showToast("⚙️ Đã tải cấu hình", "success");
   } catch (error) {
@@ -90,7 +92,8 @@ async function saveConfig() {
       geminiModel: $('#geminiModel').value,
       geminiEndpointBase: $('#geminiEndpointBase').value.trim(),
       userEmail: $('#userEmail').value.trim(),
-      apiHeaders: $('#apiHeaders').value.trim()
+      apiHeaders: $('#apiHeaders').value.trim(),
+      autoCheckUrl: $('#autoCheckUrl').checked
     };
 
     // Validate required fields

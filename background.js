@@ -5,7 +5,87 @@ console.log("Background script loaded");
 const API_UPLOAD = "https://chongluadao.vn/api/upload-image";
 // API endpoints
 const API_CHECK_URL = "https://kaiyobot.gis-humg.com/api/checkurl?url=";
-const API_CHECK_DOMAIN = "https://kaiyobot.gis-humg.com/api/checkmail?domain=";
+
+// Cấu hình mặc định
+let autoCheckUrl = false;
+let checkedUrls = new Set(); // Cache để tránh kiểm tra lại URL đã kiểm tra
+
+// Tải cấu hình từ storage
+async function loadConfiguration() {
+  try {
+    const config = await chrome.storage.sync.get(['autoCheckUrl']);
+    autoCheckUrl = config.autoCheckUrl || false;
+    console.log('Cấu hình tự động kiểm tra URL:', autoCheckUrl);
+  } catch (error) {
+    console.error('Lỗi khi tải cấu hình:', error);
+  }
+}
+
+// Tải cấu hình khi khởi động
+loadConfiguration();
+
+// Lắng nghe sự kiện khi storage thay đổi để cập nhật cấu hình
+chrome.storage.onChanged.addListener((changes, namespace) => {
+  if (namespace === 'sync' && changes.autoCheckUrl) {
+    autoCheckUrl = changes.autoCheckUrl.newValue;
+    console.log('Cấu hình tự động kiểm tra URL đã được cập nhật:', autoCheckUrl);
+    
+    // Xóa cache khi tắt tính năng
+    if (!autoCheckUrl) {
+      checkedUrls.clear();
+    }
+  }
+});
+
+// Lắng nghe sự kiện khi tab được cập nhật để tự động kiểm tra URL
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+  // Chỉ kiểm tra khi tab đã tải xong và URL đã thay đổi
+  if (changeInfo.status === 'complete' && tab.url && autoCheckUrl) {
+    // Bỏ qua các URL không phải HTTP/HTTPS
+    if (!tab.url.startsWith('http')) return;
+    
+    // Bỏ qua các trang web của Chrome
+    if (tab.url.startsWith('chrome://') || tab.url.startsWith('chrome-extension://')) return;
+    
+    // Bỏ qua các URL đã kiểm tra trong phiên này (tránh spam)
+    if (checkedUrls.has(tab.url)) return;
+    
+    console.log('Tự động kiểm tra URL:', tab.url);
+    
+    // Thêm vào cache để tránh kiểm tra lại
+    checkedUrls.add(tab.url);
+    
+    // Kiểm tra URL an toàn
+    const urlSafetyData = await checkUrlSafety(tab.url);
+    console.log('Kết quả kiểm tra URL:', urlSafetyData);
+    
+    // Nếu URL nguy hiểm, hiển thị cảnh báo
+    const isUnsafeUrl = urlSafetyData?.success && urlSafetyData.data?.result === "unsafe";
+    
+    if (isUnsafeUrl) {
+      chrome.tabs.sendMessage(tabId, { 
+        type: "URL_SAFETY_WARNING", 
+        data: {
+          urlSafety: urlSafetyData?.data,
+          isUnsafeUrl
+        }
+      }).catch(() => {});
+    }
+  }
+});
+
+// Xóa cache khi tab đóng để tránh memory leak
+chrome.tabs.onRemoved.addListener((tabId) => {
+  // Có thể thêm logic để xóa cache nếu cần
+});
+
+// Xóa cache định kỳ để tránh memory leak (mỗi 30 phút)
+setInterval(() => {
+  if (checkedUrls.size > 100) { // Chỉ xóa nếu cache quá lớn
+    checkedUrls.clear();
+    console.log('Đã xóa cache URL đã kiểm tra');
+  }
+}, 30 * 60 * 1000);
 
 // ===== Multiple API Keys Manager =====
 class GeminiKeyManager {
@@ -65,7 +145,7 @@ const geminiKeyManager = new GeminiKeyManager();
 const nowIso = () => new Date().toISOString();
 const dataUrlToBase64 = (d) => d.split(",")[1];
 
-// Kiểm tra URL có nguy hiểm không trước khi quét
+// Kiểm tra URL có nguy hiểm không
 async function checkUrlSafety(url) {
   try {
     console.log(`Checking URL safety: ${url}`);
@@ -97,32 +177,9 @@ async function checkUrlSafety(url) {
   }
 }
 
-// Kiểm tra domain đã được báo cáo chưa
-async function checkDomainReported(url) {
-  try {
-    const domain = new URL(url).hostname;
-    console.log(`Checking domain reported: ${domain}`);
-    
-    const response = await fetch(`${API_CHECK_DOMAIN}${encodeURIComponent(domain)}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
-    
-    if (!response.ok) {
-      console.warn(`Domain check failed with status: ${response.status}`);
-      return { success: false, reported: false, message: "Không thể kiểm tra domain" };
-    }
-    
-    const data = await response.json();
-    console.log('Domain report result:', data);
-    return data;
-  } catch (error) {
-    console.error('Error checking domain report:', error);
-    return { success: false, reported: false, message: "Lỗi khi kiểm tra domain" };
-  }
-}
+
+
+
 
 
 
@@ -205,7 +262,7 @@ function generateShortEvidence(aiData, reportUrl) {
 
 // Tạo báo cáo văn bản chi tiết từ AI analysis
 function generateReportText(aiData, uploadUrls) {
-  const { url, capturedAt, urlSafetyData, domainReportData } = aiData;
+  const { url, capturedAt } = aiData;
   const risk = aiData.risk || 0;
   const findings = aiData.findings || [];
   const summary = aiData.summary || "Đang phân tích...";
@@ -229,24 +286,9 @@ function generateReportText(aiData, uploadUrls) {
 
 `;
 
-  // Thêm thông tin kiểm tra URL safety nếu có
-  if (urlSafetyData && urlSafetyData.success && urlSafetyData.data) {
-    const safetyData = urlSafetyData.data;
-    report += `## 🔍 KẾT QUẢ KIỂM TRA AN TOÀN URL
-📡 **Kết quả quét:** ${safetyData.result} (${safetyData.riskLevel})
-📢 **Thông báo:** ${safetyData.message}
-📊 **Thống kê quét:** ${safetyData.summary?.total || 0} nguồn, ${safetyData.summary?.safe || 0} an toàn, ${safetyData.summary?.unsafe || 0} nguy hiểm
 
-`;
 
-    if (safetyData.details?.unsafe?.length > 0) {
-      report += `⚠️ **Nguồn cảnh báo nguy hiểm:**\n`;
-      safetyData.details.unsafe.forEach(item => {
-        report += `   • ${item.api.split('/').pop()}: ${item.note}\n`;
-      });
-      report += `\n`;
-    }
-  }
+
 
   report += `## 📝 TÓM TẮT ĐÁNH GIÁ
 ${summary}
@@ -279,15 +321,6 @@ ${recommendation}
   }
   if (uploadUrls.annotated && uploadUrls.annotated !== 'Failed to upload') {
     report += `• **Ảnh phân tích:** ${uploadUrls.annotated}\n`;
-  }
-
-  // Thêm thông tin domain report nếu có
-  if (domainReportData?.success && domainReportData.reported) {
-    report += `\n\n## 🚨 CẢNH BÁO DOMAIN ĐÃ BÁO CÁO
-📋 **Domain:** ${domainReportData.domain}
-⚠️ **Trạng thái:** ${domainReportData.reported ? 'Đã được báo cáo trong tháng này' : 'Chưa có báo cáo'}
-📅 **Thời gian kiểm tra:** ${new Date(domainReportData.timestamp).toLocaleString('vi-VN')}
-💬 **Ghi chú:** ${domainReportData.message || 'Domain này đã từng được người dùng khác báo cáo'}`;
   }
 
   report += `
@@ -1931,29 +1964,9 @@ async function pushHistory(entry) {
 }
 
 // ===== Gemini (Google Generative Language API) =====
-function buildGeminiPrompt(context, urlSafetyData = null) {
-  // Tích hợp thông tin an toàn URL vào prompt nếu có
-  let urlSafetyContext = '';
-  if (urlSafetyData && urlSafetyData.success && urlSafetyData.data) {
-    const { result, riskLevel, message, summary, details } = urlSafetyData.data;
-    urlSafetyContext = `
-THÔNG TIN AN TOÀN URL ĐÃ KIỂM TRA:
-- Kết quả tổng quát: ${result} (mức độ rủi ro: ${riskLevel})
-- Thông báo: ${message}
-- Tổng kết quét: ${summary?.total || 0} nguồn kiểm tra, ${summary?.safe || 0} an toàn, ${summary?.unsafe || 0} nguy hiểm, ${summary?.unknown || 0} không xác định
-${details?.unsafe?.length > 0 ? `- Nguồn cảnh báo nguy hiểm: ${details.unsafe.map(u => u.api + ': ' + u.note).join('; ')}` : ''}
-${details?.safe?.length > 0 ? `- Số nguồn xác nhận an toàn: ${details.safe.length}` : ''}
-
-QUAN TRỌNG: Hãy tích hợp thông tin này vào phân tích để đưa ra đánh giá chính xác hơn.
-`;
-  }
-
-
-
+function buildGeminiPrompt(context) {
   return `
 Bạn là chuyên gia an ninh mạng và phân tích lừa đảo web hàng đầu. Phân tích TOÀN DIỆN và CHUYÊN SÂU hình ảnh cùng nội dung trang web để đưa ra đánh giá RỦI RO chi tiết nhất.
-
-${urlSafetyContext}
 
 YÊU CẦU PHÂN TÍCH CHUYÊN SÂU - QUÉT TOÀN BỘ TRANG WEB:
 1. 🔍 QUÉT GỚI GIAO DIỆN: Phân tích từng element (buttons, forms, links, images, icons, menus)
@@ -2160,7 +2173,7 @@ Hãy luôn quét toàn bộ chiều dài trang từ header đến footer, chú �
 Viết evidence_text như báo cáo chuyên gia (300+ từ) và technical_analysis chi tiết về cấu trúc trang. Recommendation phải cụ thể dựa trên full context của trang.`;
 }
 
-async function callGemini({ model, imageBase64, context, endpointBase, urlSafetyData = null }) {
+async function callGemini({ model, imageBase64, context, endpointBase }) {
   // Load keys nếu chưa có
   if (geminiKeyManager.keys.length === 0) {
     await geminiKeyManager.loadKeys();
@@ -2183,7 +2196,7 @@ async function callGemini({ model, imageBase64, context, endpointBase, urlSafety
     contents: [{
       role: "user",
       parts: [
-          { text: buildGeminiPrompt(context, urlSafetyData) },
+          { text: buildGeminiPrompt(context) },
         { inlineData: { mimeType: "image/png", data: imageBase64 } }
       ]
     }],
@@ -2268,43 +2281,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           throw new Error("Chưa cấu hình Gemini API Keys trong Options. Vui lòng thêm ít nhất 1 API key.");
         }
 
-        // 0) Kiểm tra an toàn URL và domain đã báo cáo trước khi quét (nếu không phải force scan)
-        let urlSafetyData = null;
-        let domainReportData = null;
-        if (!msg.forceScan) {
-          // Bỏ thông báo progress - chỉ im lặng quét
-          
-          const [currentTab] = await chrome.tabs.query({ active: true, currentWindow: true });
-          
-          // Kiểm tra URL safety và domain report song song
-          const [urlSafetyResult, domainReportResult] = await Promise.all([
-            checkUrlSafety(currentTab.url),
-            checkDomainReported(currentTab.url)
-          ]);
-          
-          urlSafetyData = urlSafetyResult;
-          domainReportData = domainReportResult;
-          
-          console.log('URL Safety Check Result:', urlSafetyData);
-          console.log('Domain Report Check Result:', domainReportData);
-          
-          // Nếu URL nguy hiểm hoặc domain đã được báo cáo và người dùng chưa xác nhận tiếp tục
-          const isUnsafeUrl = urlSafetyData?.success && urlSafetyData.data?.result === "unsafe";
-          const isDomainReported = domainReportData?.success && domainReportData.reported;
-          
-          if (isUnsafeUrl || isDomainReported) {
-            chrome.tabs.sendMessage(tabId, { 
-              type: "URL_SAFETY_WARNING", 
-              data: {
-                urlSafety: urlSafetyData?.data,
-                domainReport: domainReportData,
-                isUnsafeUrl,
-                isDomainReported
-              }
-            }).catch(() => {});
-            return; // Dừng quét để chờ người dùng xác nhận
-          }
-        }
+
 
         // 1) Lấy context và chụp ảnh theo chế độ được chọn (im lặng)
         const ctx = await getPageContext(tabId);
@@ -2332,16 +2309,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           model: geminiModel || "gemini-2.0-flash",
           imageBase64: shotBase64,
           context: ctx,
-          endpointBase: geminiEndpointBase,
-          urlSafetyData: urlSafetyData // Truyền thông tin safety check
+          endpointBase: geminiEndpointBase
         });
 
         // 3) Bổ sung thông tin
         aiReport.url = ctx.url;
         aiReport.capturedAt = nowIso();
         aiReport.context = ctx; // Lưu context để sử dụng trong báo cáo
-        aiReport.urlSafetyData = urlSafetyData; // Lưu kết quả kiểm tra an toàn URL
-        aiReport.domainReportData = domainReportData; // Lưu kết quả kiểm tra domain đã báo cáo
 
 
         // 4) Upload ảnh viewport hiện tại với error handling mạnh mẽ

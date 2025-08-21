@@ -97,26 +97,14 @@ function showStatusUpdate(message, progress = null, step = null, totalSteps = nu
   }
 }
 
-// Hiển thị cảnh báo URL nguy hiểm hoặc domain đã báo cáo
+// Hiển thị cảnh báo URL nguy hiểm
 function showUrlSafetyWarning(data) {
-  const { urlSafety, domainReport, isUnsafeUrl, isDomainReported } = data;
+  const { urlSafety, isUnsafeUrl } = data;
   
   // Xác định thông tin hiển thị dựa trên loại cảnh báo
   let warningTitle, warningIcon, mainMessage, riskLevel, riskColor;
   
-  if (isDomainReported && isUnsafeUrl) {
-    warningTitle = "Cảnh báo nghiêm trọng!";
-    warningIcon = "🚫";
-    mainMessage = `Domain này vừa bị đánh dấu nguy hiểm VÀ đã được báo cáo trong tháng này!`;
-    riskLevel = "HIGH";
-    riskColor = "#dc2626";
-  } else if (isDomainReported) {
-    warningTitle = "Domain đã được báo cáo!";
-    warningIcon = "🚨";
-    mainMessage = domainReport.message || "Domain này đã được báo cáo trong tháng này";
-    riskLevel = "MEDIUM";
-    riskColor = "#f59e0b";
-  } else if (isUnsafeUrl) {
+  if (isUnsafeUrl) {
     warningTitle = "Cảnh báo URL nguy hiểm!";
     warningIcon = "⚠️";
     mainMessage = urlSafety.message || "URL này được đánh dấu là nguy hiểm";
@@ -172,16 +160,7 @@ function showUrlSafetyWarning(data) {
       </p>
     </div>
     
-    ${isDomainReported ? `
-      <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
-        <h3 style="margin: 0 0 10px 0; color: #dc2626;">📋 Thông tin báo cáo domain:</h3>
-        <p style="margin: 0; color: #7f1d1d;">
-          <strong>Domain:</strong> ${domainReport.domain}<br>
-          <strong>Trạng thái:</strong> ${domainReport.reported ? 'Đã được báo cáo' : 'Chưa có báo cáo'}<br>
-          <strong>Thời gian:</strong> ${new Date(domainReport.timestamp).toLocaleString('vi-VN')}
-        </p>
-      </div>
-    ` : ''}
+
     
     ${isUnsafeUrl ? `
       <div style="margin-bottom: 20px;">
@@ -225,7 +204,7 @@ function showUrlSafetyWarning(data) {
         font-weight: 500;
         cursor: pointer;
         margin-right: 10px;
-      ">❌ Hủy quét</button>
+      ">❌ Tắt</button>
       
       <button id="chongluadao-force-scan" style="
         background: #f59e0b;
@@ -236,7 +215,7 @@ function showUrlSafetyWarning(data) {
         font-size: 14px;
         font-weight: 500;
         cursor: pointer;
-      ">🔍 Vẫn tiếp tục quét</button>
+      ">🔍 Tiếp Tục Truy Cập</button>
     </div>
     
     <p style="text-align: center; margin-top: 15px; font-size: 12px; color: #6b7280;">

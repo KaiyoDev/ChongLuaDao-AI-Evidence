@@ -72,6 +72,25 @@
   </div>
 
   <div class="config-section">
+    <h3>🔍 Cấu hình Kiểm tra Tự động</h3>
+    <div class="form-group">
+      <label class="checkbox-label">
+        <input type="checkbox" id="autoCheckUrl" />
+        <span>Tự động kiểm tra URL khi truy cập trang web</span>
+      </label>
+      <small class="help-text">
+        Khi bật, extension sẽ tự động kiểm tra URL qua API https://kaiyobot.gis-humg.com/api/checkurl 
+        khi bạn truy cập trang web mới và hiển thị cảnh báo nếu phát hiện rủi ro.
+        <br><br>
+        <strong>Lưu ý:</strong> 
+        • Chỉ kiểm tra mỗi URL một lần trong phiên để tránh spam
+        • Tính năng này hoạt động độc lập với quét AI
+        • Bạn vẫn có thể quét thủ công bằng nút "Quét trang web" trong popup để phân tích chi tiết bằng AI
+      </small>
+    </div>
+  </div>
+
+  <div class="config-section">
     <h3>📤 Cấu hình Upload Ảnh</h3>
     <div class="form-group">
       <label for="apiHeaders">Headers tùy chỉnh (JSON)</label>
