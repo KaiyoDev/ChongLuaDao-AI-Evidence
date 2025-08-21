@@ -5,7 +5,7 @@ console.log("Background script loaded");
 const API_UPLOAD = "https://chongluadao.vn/api/upload-image";
 // API endpoints
 const API_CHECK_URL = "https://kaiyobot.gis-humg.com/api/checkurl?url=";
-const URLS_FILTER = { urls: ["<all_urls>"], types: ["main_frame"] };
+// const URLS_FILTER = { urls: ["<all_urls>"], types: ["main_frame"] };
 
 // Cấu hình mặc định
 let autoCheckUrl = false;
@@ -71,9 +71,10 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
 
 // Lắng nghe sự kiện khi tab được cập nhật để tự động kiểm tra URL
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
-  if (changeInfo.status !== 'complete' || !tab.url || !autoCheckUrl) return;
-    if (!tab.url.startsWith('http')) return;
-    if (tab.url.startsWith('chrome://') || tab.url.startsWith('chrome-extension://')) return;
+  if (!autoCheckUrl || !tab.url) return;
+  if (changeInfo.status !== 'loading' && changeInfo.status !== 'complete') return;
+  if (!tab.url.startsWith('http')) return;
+  if (tab.url.startsWith('chrome://') || tab.url.startsWith('chrome-extension://')) return;
   if (checkedUrls.has(tab.url)) return;
 
   const whitelistUrls = whitelistCache;
@@ -122,96 +123,7 @@ setInterval(() => {
   }
 }, 30 * 60 * 1000);
 
-// Chặn điều hướng trước khi tải trang: đưa vào hàng đợi kiểm tra
-// Lưu ý: Manifest V3 cho phép chặn với webRequestBlocking
-chrome.webRequest.onBeforeRequest.addListener(
-  function(details) {
-    if (!autoCheckUrl) return { cancel: false };
-    const url = details.url || '';
-    if (!url.startsWith('http')) return { cancel: false };
-
-    const key = `${details.tabId}|${url}`;
-
-    // Cho phép đi qua một lần sau khi đã kiểm tra
-    if (allowOnceNavigation.has(key)) {
-      allowOnceNavigation.delete(key);
-      return { cancel: false };
-    }
-
-    // Tôn trọng whitelist
-    if (isUrlInWhitelist(url, whitelistCache)) {
-      return { cancel: false };
-    }
-
-    // URL đã được xác nhận
-    if (safeUrls.has(url)) {
-      return { cancel: false };
-    }
-    if (unsafeUrls.has(url)) {
-      try {
-        chrome.notifications.create(`unsafe-${Date.now()}`, {
-          type: 'basic', iconUrl: 'icons/icon128.png', title: 'Cảnh báo URL nguy hiểm',
-          message: 'Trang bạn sắp truy cập có dấu hiệu nguy hiểm.'
-        });
-      } catch (e) {}
-      return { cancel: true };
-    }
-
-    // Nếu đang xử lý URL này, tiếp tục chặn đến khi có kết quả
-    if (processingUrls.has(url)) {
-      return { cancel: true };
-    }
-
-    // Chặn tạm thời và đưa vào hàng đợi kiểm tra tuần tự
-    processingUrls.add(url);
-    enqueueUrlCheck(async () => {
-      try {
-        if (checkedUrls.has(url)) {
-          safeUrls.add(url);
-          allowOnceNavigation.add(key);
-          processingUrls.delete(url);
-          chrome.tabs.update(details.tabId, { url }).catch(() => {});
-          return;
-        }
-
-        checkedUrls.add(url);
-        const urlSafetyData = await checkUrlSafety(url);
-        const isUnsafe = urlSafetyData?.success && urlSafetyData.data?.result === 'unsafe';
-        if (isUnsafe) {
-          unsafeUrls.add(url);
-          processingUrls.delete(url);
-          try {
-            await chrome.tabs.sendMessage(details.tabId, {
-              type: 'URL_SAFETY_WARNING',
-              data: { urlSafety: urlSafetyData?.data, isUnsafeUrl: true }
-            });
-          } catch (_) {
-            try {
-              await chrome.notifications.create(`unsafe-${Date.now()}`, {
-                type: 'basic', iconUrl: 'icons/icon128.png', title: 'Cảnh báo URL nguy hiểm',
-                message: 'Trang bạn sắp truy cập có dấu hiệu nguy hiểm.'
-              });
-            } catch (e) {}
-          }
-        } else {
-          safeUrls.add(url);
-          allowOnceNavigation.add(key);
-          processingUrls.delete(url);
-          chrome.tabs.update(details.tabId, { url }).catch(() => {});
-        }
-      } catch (e) {
-        // lỗi thì cho qua để tránh kẹt
-        allowOnceNavigation.add(key);
-        processingUrls.delete(url);
-        chrome.tabs.update(details.tabId, { url }).catch(() => {});
-      }
-    });
-
-    return { cancel: true };
-  },
-  URLS_FILTER,
-  ["blocking"]
-);
+// Gỡ bỏ chặn điều hướng vì MV3 không cho phép webRequestBlocking với extension thường
 
 // ===== Multiple API Keys Manager =====
 class GeminiKeyManager {
