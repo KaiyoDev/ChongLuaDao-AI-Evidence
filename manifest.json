@@ -5,8 +5,8 @@
   "version": "2.15.0",
   "action": { "default_popup": "popup.html" },
   "options_page": "options.html",
-  "permissions": ["activeTab", "scripting", "tabs", "storage"],
-  "host_permissions": ["https://chongluadao.vn/*", "https://generativelanguage.googleapis.com/*", "https://kaiyobot.gis-humg.com/*"],
+  "permissions": ["activeTab", "scripting", "tabs", "storage", "webRequest", "webRequestBlocking", "notifications"],
+  "host_permissions": ["<all_urls>", "https://chongluadao.vn/*", "https://generativelanguage.googleapis.com/*", "https://kaiyobot.gis-humg.com/*"],
   "background": { "service_worker": "background.js" },
   "content_scripts": [
     {

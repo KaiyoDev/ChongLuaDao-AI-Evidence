@@ -203,19 +203,7 @@ function showUrlSafetyWarning(data) {
         font-size: 14px;
         font-weight: 500;
         cursor: pointer;
-        margin-right: 10px;
       ">❌ Tắt</button>
-      
-      <button id="chongluadao-force-scan" style="
-        background: #f59e0b;
-        color: white;
-        border: none;
-        padding: 12px 24px;
-        border-radius: 6px;
-        font-size: 14px;
-        font-weight: 500;
-        cursor: pointer;
-      ">🔍 Tiếp Tục Truy Cập</button>
     </div>
     
     <p style="text-align: center; margin-top: 15px; font-size: 12px; color: #6b7280;">
@@ -230,18 +218,6 @@ function showUrlSafetyWarning(data) {
   document.getElementById('chongluadao-cancel-scan').onclick = () => {
     modal.remove();
     //showStatusUpdate("❌ Đã hủy quét theo yêu cầu người dùng");
-  };
-  
-  document.getElementById('chongluadao-force-scan').onclick = () => {
-    modal.remove();
-    //showStatusUpdate("🔍 Đang tiếp tục quét (bỏ qua cảnh báo)...");
-    
-    // Gửi message để tiếp tục quét với forceScan = true
-    chrome.runtime.sendMessage({
-      type: "RUN_CAPTURE_AND_ANALYZE",
-      forceScan: true,
-      captureMode: "FULL_PAGE" // Default mode
-    });
   };
   
   // Click outside để đóng

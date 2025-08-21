@@ -5,16 +5,44 @@ console.log("Background script loaded");
 const API_UPLOAD = "https://chongluadao.vn/api/upload-image";
 // API endpoints
 const API_CHECK_URL = "https://kaiyobot.gis-humg.com/api/checkurl?url=";
+const URLS_FILTER = { urls: ["<all_urls>"], types: ["main_frame"] };
 
 // Cấu hình mặc định
 let autoCheckUrl = false;
 let checkedUrls = new Set(); // Cache để tránh kiểm tra lại URL đã kiểm tra
+let whitelistCache = [];
+// Hàng đợi tuần tự kiểm tra URL và các cấu trúc hỗ trợ gate điều hướng
+const urlCheckQueue = [];
+let isProcessingQueue = false;
+const allowOnceNavigation = new Set(); // key: `${tabId}|${url}` được phép đi qua 1 lần sau khi kiểm tra an toàn
+const processingUrls = new Set(); // đang kiểm tra url (tránh enqueue lặp)
+const safeUrls = new Set(); // các URL đã xác nhận an toàn
+const unsafeUrls = new Set(); // các URL đã xác nhận nguy hiểm
+
+function enqueueUrlCheck(task) {
+  urlCheckQueue.push(task);
+  processUrlQueue();
+}
+
+async function processUrlQueue() {
+  if (isProcessingQueue) return;
+  isProcessingQueue = true;
+  try {
+    while (urlCheckQueue.length > 0) {
+      const task = urlCheckQueue.shift();
+      await task();
+    }
+  } finally {
+    isProcessingQueue = false;
+  }
+}
 
 // Tải cấu hình từ storage
 async function loadConfiguration() {
   try {
-    const config = await chrome.storage.sync.get(['autoCheckUrl']);
+    const config = await chrome.storage.sync.get(['autoCheckUrl', 'whitelistUrls']);
     autoCheckUrl = config.autoCheckUrl || false;
+    whitelistCache = Array.isArray(config.whitelistUrls) ? config.whitelistUrls : [];
     console.log('Cấu hình tự động kiểm tra URL:', autoCheckUrl);
   } catch (error) {
     console.error('Lỗi khi tải cấu hình:', error);
@@ -35,50 +63,50 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
       checkedUrls.clear();
     }
   }
+  if (namespace === 'sync' && changes.whitelistUrls) {
+    whitelistCache = Array.isArray(changes.whitelistUrls.newValue) ? changes.whitelistUrls.newValue : [];
+    console.log('Whitelist cập nhật, số lượng:', whitelistCache.length);
+  }
 });
 
 // Lắng nghe sự kiện khi tab được cập nhật để tự động kiểm tra URL
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
-  // Chỉ kiểm tra khi tab đã tải xong và URL đã thay đổi
-  if (changeInfo.status === 'complete' && tab.url && autoCheckUrl) {
-    // Bỏ qua các URL không phải HTTP/HTTPS
+  if (changeInfo.status !== 'complete' || !tab.url || !autoCheckUrl) return;
     if (!tab.url.startsWith('http')) return;
-    
-    // Bỏ qua các trang web của Chrome
     if (tab.url.startsWith('chrome://') || tab.url.startsWith('chrome-extension://')) return;
-    
-    // Bỏ qua các URL đã kiểm tra trong phiên này (tránh spam)
-    if (checkedUrls.has(tab.url)) return;
-    
-    // Kiểm tra whitelist
-    const { whitelistUrls = [] } = await chrome.storage.sync.get(['whitelistUrls']);
-    if (isUrlInWhitelist(tab.url, whitelistUrls)) {
-      console.log('URL trong whitelist, bỏ qua kiểm tra:', tab.url);
-      return;
-    }
-    
-    console.log('Tự động kiểm tra URL:', tab.url);
-    
-    // Thêm vào cache để tránh kiểm tra lại
-    checkedUrls.add(tab.url);
-    
-    // Kiểm tra URL an toàn
-    const urlSafetyData = await checkUrlSafety(tab.url);
-    console.log('Kết quả kiểm tra URL:', urlSafetyData);
-    
-    // Nếu URL nguy hiểm, hiển thị cảnh báo
-    const isUnsafeUrl = urlSafetyData?.success && urlSafetyData.data?.result === "unsafe";
-    
-    if (isUnsafeUrl) {
-      chrome.tabs.sendMessage(tabId, { 
-        type: "URL_SAFETY_WARNING", 
-        data: {
-          urlSafety: urlSafetyData?.data,
-          isUnsafeUrl
-        }
-      }).catch(() => {});
-    }
+  if (checkedUrls.has(tab.url)) return;
+
+  const whitelistUrls = whitelistCache;
+  if (isUrlInWhitelist(tab.url, whitelistUrls)) {
+    return;
   }
+
+  // Đưa vào hàng đợi để đảm bảo kiểm tra tuần tự
+  enqueueUrlCheck(async () => {
+    // Có thể URL đã được kiểm tra khi chờ, kiểm tra lại trước khi gọi API
+    if (checkedUrls.has(tab.url)) return;
+    checkedUrls.add(tab.url);
+    const urlSafetyData = await checkUrlSafety(tab.url);
+    const isUnsafeUrl = urlSafetyData?.success && urlSafetyData.data?.result === 'unsafe';
+    if (isUnsafeUrl) {
+      try {
+        await chrome.tabs.sendMessage(tabId, {
+          type: 'URL_SAFETY_WARNING',
+          data: { urlSafety: urlSafetyData?.data, isUnsafeUrl }
+        });
+      } catch (_) {
+        // Fallback thông báo hệ thống nếu content-script chưa sẵn sàng
+        try {
+          await chrome.notifications.create(`unsafe-${Date.now()}`, {
+            type: 'basic',
+            iconUrl: 'icons/icon128.png',
+            title: 'Cảnh báo URL nguy hiểm',
+            message: 'Trang bạn vừa mở có dấu hiệu nguy hiểm. Hãy thận trọng!'
+          });
+        } catch (e) {}
+      }
+    }
+  });
 });
 
 // Xóa cache khi tab đóng để tránh memory leak
@@ -93,6 +121,97 @@ setInterval(() => {
     console.log('Đã xóa cache URL đã kiểm tra');
   }
 }, 30 * 60 * 1000);
+
+// Chặn điều hướng trước khi tải trang: đưa vào hàng đợi kiểm tra
+// Lưu ý: Manifest V3 cho phép chặn với webRequestBlocking
+chrome.webRequest.onBeforeRequest.addListener(
+  function(details) {
+    if (!autoCheckUrl) return { cancel: false };
+    const url = details.url || '';
+    if (!url.startsWith('http')) return { cancel: false };
+
+    const key = `${details.tabId}|${url}`;
+
+    // Cho phép đi qua một lần sau khi đã kiểm tra
+    if (allowOnceNavigation.has(key)) {
+      allowOnceNavigation.delete(key);
+      return { cancel: false };
+    }
+
+    // Tôn trọng whitelist
+    if (isUrlInWhitelist(url, whitelistCache)) {
+      return { cancel: false };
+    }
+
+    // URL đã được xác nhận
+    if (safeUrls.has(url)) {
+      return { cancel: false };
+    }
+    if (unsafeUrls.has(url)) {
+      try {
+        chrome.notifications.create(`unsafe-${Date.now()}`, {
+          type: 'basic', iconUrl: 'icons/icon128.png', title: 'Cảnh báo URL nguy hiểm',
+          message: 'Trang bạn sắp truy cập có dấu hiệu nguy hiểm.'
+        });
+      } catch (e) {}
+      return { cancel: true };
+    }
+
+    // Nếu đang xử lý URL này, tiếp tục chặn đến khi có kết quả
+    if (processingUrls.has(url)) {
+      return { cancel: true };
+    }
+
+    // Chặn tạm thời và đưa vào hàng đợi kiểm tra tuần tự
+    processingUrls.add(url);
+    enqueueUrlCheck(async () => {
+      try {
+        if (checkedUrls.has(url)) {
+          safeUrls.add(url);
+          allowOnceNavigation.add(key);
+          processingUrls.delete(url);
+          chrome.tabs.update(details.tabId, { url }).catch(() => {});
+          return;
+        }
+
+        checkedUrls.add(url);
+        const urlSafetyData = await checkUrlSafety(url);
+        const isUnsafe = urlSafetyData?.success && urlSafetyData.data?.result === 'unsafe';
+        if (isUnsafe) {
+          unsafeUrls.add(url);
+          processingUrls.delete(url);
+          try {
+            await chrome.tabs.sendMessage(details.tabId, {
+              type: 'URL_SAFETY_WARNING',
+              data: { urlSafety: urlSafetyData?.data, isUnsafeUrl: true }
+            });
+          } catch (_) {
+            try {
+              await chrome.notifications.create(`unsafe-${Date.now()}`, {
+                type: 'basic', iconUrl: 'icons/icon128.png', title: 'Cảnh báo URL nguy hiểm',
+                message: 'Trang bạn sắp truy cập có dấu hiệu nguy hiểm.'
+              });
+            } catch (e) {}
+          }
+        } else {
+          safeUrls.add(url);
+          allowOnceNavigation.add(key);
+          processingUrls.delete(url);
+          chrome.tabs.update(details.tabId, { url }).catch(() => {});
+        }
+      } catch (e) {
+        // lỗi thì cho qua để tránh kẹt
+        allowOnceNavigation.add(key);
+        processingUrls.delete(url);
+        chrome.tabs.update(details.tabId, { url }).catch(() => {});
+      }
+    });
+
+    return { cancel: true };
+  },
+  URLS_FILTER,
+  ["blocking"]
+);
 
 // ===== Multiple API Keys Manager =====
 class GeminiKeyManager {
