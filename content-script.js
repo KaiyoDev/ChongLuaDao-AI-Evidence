@@ -97,9 +97,224 @@ function showStatusUpdate(message, progress = null, step = null, totalSteps = nu
   }
 }
 
+// Hiển thị thông báo kiểm tra link bắt đầu
+function showLinkCheckStart(data) {
+  const { url } = data;
+  
+  // Tạo modal kiểm tra link
+  const modal = document.createElement('div');
+  modal.id = 'chongluadao-link-check-modal';
+  modal.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.8);
+    z-index: 9999999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  `;
+  
+  const content = document.createElement('div');
+  content.style.cssText = `
+    background: white;
+    padding: 40px;
+    border-radius: 16px;
+    max-width: 500px;
+    width: 90%;
+    text-align: center;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+  `;
+  
+  content.innerHTML = `
+    <div style="margin-bottom: 30px;">
+      <div style="font-size: 64px; margin-bottom: 20px;">🔍</div>
+      <h2 style="margin: 0; color: #374151; font-size: 28px; font-weight: 600;">Đang kiểm tra link an toàn</h2>
+    </div>
+    
+    <div style="background: #f3f4f6; border-radius: 12px; padding: 20px; margin-bottom: 30px;">
+      <p style="margin: 0; color: #6b7280; font-size: 16px; line-height: 1.5;">
+        <strong>URL:</strong> ${url}<br>
+        <span style="font-size: 14px; opacity: 0.8;">Vui lòng chờ trong giây lát...</span>
+      </p>
+    </div>
+    
+    <div style="margin-bottom: 30px;">
+      <div style="
+        background: #e5e7eb;
+        border-radius: 10px;
+        height: 8px;
+        overflow: hidden;
+        position: relative;
+      ">
+        <div style="
+          background: linear-gradient(90deg, #3b82f6, #1d4ed8);
+          height: 100%;
+          width: 0%;
+          border-radius: 10px;
+          animation: loadingProgress 2s infinite;
+        "></div>
+      </div>
+    </div>
+    
+    <div style="color: #6b7280; font-size: 14px;">
+      <p style="margin: 0 0 10px 0;">🛡️ ChongLuaDao đang phân tích:</p>
+      <ul style="text-align: left; margin: 0; padding-left: 20px; line-height: 1.6;">
+        <li>Mức độ rủi ro của trang web</li>
+        <li>Dấu hiệu lừa đảo và mã độc</li>
+        <li>Thông tin bảo mật và SSL</li>
+        <li>Danh tiếng domain</li>
+      </ul>
+    </div>
+  `;
+  
+  modal.appendChild(content);
+  document.body.appendChild(modal);
+  
+  // CSS animation cho loading
+  const style = document.createElement('style');
+  style.textContent = `
+    @keyframes loadingProgress {
+      0% { width: 0%; }
+      50% { width: 70%; }
+      100% { width: 100%; }
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+// Hiển thị thông báo link an toàn
+function showLinkCheckSafe(data) {
+  const { url, urlSafety } = data;
+  
+  // Xóa modal kiểm tra nếu có
+  const existingModal = document.getElementById('chongluadao-link-check-modal');
+  if (existingModal) {
+    existingModal.remove();
+  }
+  
+  // Tạo thông báo an toàn
+  const notification = document.createElement('div');
+  notification.id = 'chongluadao-safe-notification';
+  notification.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+    padding: 20px;
+    border-radius: 12px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+    backdrop-filter: blur(10px);
+    z-index: 999999;
+    min-width: 320px;
+    max-width: 400px;
+    animation: slideInRight 0.3s ease-out;
+  `;
+  
+  notification.innerHTML = `
+    <div style="text-align: center; margin-bottom: 15px;">
+      <div style="font-size: 48px; margin-bottom: 10px;">✅</div>
+      <h3 style="margin: 0; font-size: 18px; font-weight: 600;">Link an toàn!</h3>
+    </div>
+    
+    <div style="background: rgba(255,255,255,0.2); border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+      <p style="margin: 0; font-size: 13px; line-height: 1.4;">
+        <strong>URL:</strong> ${url}<br>
+        <span style="opacity: 0.9;">Đang chuyển hướng trong giây lát...</span>
+      </p>
+    </div>
+    
+    <div style="text-align: center; font-size: 12px; opacity: 0.8;">
+      🛡️ ChongLuaDao đã xác nhận an toàn
+    </div>
+  `;
+  
+  document.body.appendChild(notification);
+  
+  // Tự động ẩn sau 3 giây
+  setTimeout(() => {
+    if (notification.parentNode) {
+      notification.parentNode.removeChild(notification);
+    }
+  }, 3000);
+}
+
+// Hiển thị thông báo lỗi kiểm tra link
+function showLinkCheckError(data) {
+  const { url, error } = data;
+  
+  // Xóa modal kiểm tra nếu có
+  const existingModal = document.getElementById('chongluadao-link-check-modal');
+  if (existingModal) {
+    existingModal.remove();
+  }
+  
+  // Tạo thông báo lỗi
+  const notification = document.createElement('div');
+  notification.id = 'chongluadao-error-notification';
+  notification.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    color: white;
+    padding: 20px;
+    border-radius: 12px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+    backdrop-filter: blur(10px);
+    z-index: 999999;
+    min-width: 320px;
+    max-width: 400px;
+    animation: slideInRight 0.3s ease-out;
+  `;
+  
+  notification.innerHTML = `
+    <div style="text-align: center; margin-bottom: 15px;">
+      <div style="font-size: 48px; margin-bottom: 10px;">⚠️</div>
+      <h3 style="margin: 0; font-size: 18px; font-weight: 600;">Không thể kiểm tra</h3>
+    </div>
+    
+    <div style="background: rgba(255,255,255,0.2); border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+      <p style="margin: 0; font-size: 13px; line-height: 1.4;">
+        <strong>URL:</strong> ${url}<br>
+        <span style="opacity: 0.9;">Lỗi: ${error}</span>
+      </p>
+    </div>
+    
+    <div style="text-align: center; font-size: 12px; opacity: 0.8;">
+      Vẫn sẽ chuyển hướng sau 2 giây
+    </div>
+  `;
+  
+  document.body.appendChild(notification);
+  
+  // Tự động ẩn sau 3 giây
+  setTimeout(() => {
+    if (notification.parentNode) {
+      notification.parentNode.removeChild(notification);
+    }
+  }, 3000);
+}
+
 // Hiển thị cảnh báo URL nguy hiểm
 function showUrlSafetyWarning(data) {
   const { urlSafety, isUnsafeUrl } = data;
+  
+  // Xóa modal kiểm tra nếu có
+  const existingModal = document.getElementById('chongluadao-link-check-modal');
+  if (existingModal) {
+    existingModal.remove();
+  }
   
   // Xác định thông tin hiển thị dựa trên loại cảnh báo
   let warningTitle, warningIcon, mainMessage, riskLevel, riskColor;
@@ -239,6 +454,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     showStatusUpdate(message.message, message.progress, message.step, message.totalSteps);
   } else if (message.type === "URL_SAFETY_WARNING") {
     showUrlSafetyWarning(message.data);
+  } else if (message.type === "LINK_CHECK_START") {
+    showLinkCheckStart(message.data);
+  } else if (message.type === "LINK_CHECK_SAFE") {
+    showLinkCheckSafe(message.data);
+  } else if (message.type === "LINK_CHECK_ERROR") {
+    showLinkCheckError(message.data);
   }
   // Bỏ ANALYSIS_COMPLETE - không cần thông báo to nữa
 });

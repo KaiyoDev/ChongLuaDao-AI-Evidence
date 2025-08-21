@@ -19,6 +19,9 @@ const processingUrls = new Set(); // đang kiểm tra url (tránh enqueue lặp)
 const safeUrls = new Set(); // các URL đã xác nhận an toàn
 const unsafeUrls = new Set(); // các URL đã xác nhận nguy hiểm
 
+// Thêm biến để theo dõi trạng thái kiểm tra link
+const linkCheckStatus = new Map(); // key: `${tabId}|${url}`, value: { status: 'checking'|'safe'|'unsafe', timestamp }
+
 function enqueueUrlCheck(task) {
   urlCheckQueue.push(task);
   processUrlQueue();
@@ -61,15 +64,149 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
     // Xóa cache khi tắt tính năng
     if (!autoCheckUrl) {
       checkedUrls.clear();
+      // Xóa cả cache link checking khi tắt tính năng
+      linkCheckStatus.clear();
+      processingUrls.clear();
+      allowOnceNavigation.clear();
+      console.log('Đã xóa tất cả cache khi tắt tính năng auto check');
     }
   }
   if (namespace === 'sync' && changes.whitelistUrls) {
     whitelistCache = Array.isArray(changes.whitelistUrls.newValue) ? changes.whitelistUrls.newValue : [];
     console.log('Whitelist cập nhật, số lượng:', whitelistCache.length);
+    
+    // Xóa cache cho các URL đã được thêm vào whitelist
+    const newWhitelist = new Set(whitelistCache.map(url => url.toLowerCase()));
+    for (const [key, value] of linkCheckStatus) {
+      const url = key.split('|')[1];
+      if (url && isUrlInWhitelist(url, whitelistCache)) {
+        linkCheckStatus.delete(key);
+        console.log(`Đã xóa cache cho URL trong whitelist: ${url}`);
+      }
+    }
   }
 });
 
-// Lắng nghe sự kiện khi tab được cập nhật để tự động kiểm tra URL
+// Thêm listener cho webNavigation để chặn điều hướng và kiểm tra link trước
+chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
+  // Chỉ xử lý main frame navigation
+  if (details.frameId !== 0) return;
+  
+  // Kiểm tra xem tính năng có được bật không
+  if (!autoCheckUrl) {
+    console.log('Tính năng auto check URL đã tắt, bỏ qua kiểm tra link');
+    return;
+  }
+  
+  const { url, tabId } = details;
+  
+  // Bỏ qua các URL không cần kiểm tra
+  if (!url || !url.startsWith('http') || 
+      url.startsWith('chrome://') || 
+      url.startsWith('chrome-extension://') ||
+      url.startsWith('moz-extension://')) {
+    return;
+  }
+  
+  // Kiểm tra whitelist trước
+  const whitelistUrls = whitelistCache;
+  if (isUrlInWhitelist(url, whitelistUrls)) {
+    console.log(`URL ${url} trong whitelist, cho phép điều hướng`);
+    return;
+  }
+  
+  // Kiểm tra xem có được phép điều hướng không (user đã chọn "Vẫn Truy cập")
+  const allowKey = `${tabId}|${url}`;
+  if (allowOnceNavigation.has(allowKey)) {
+    console.log(`URL ${url} được phép điều hướng (user đã chọn "Vẫn Truy cập")`);
+    return;
+  }
+  
+  // Kiểm tra cache
+  const cacheKey = `${tabId}|${url}`;
+  if (linkCheckStatus.has(cacheKey)) {
+    const status = linkCheckStatus.get(cacheKey);
+    // Nếu đã kiểm tra trong vòng 5 phút, sử dụng kết quả cache
+    if (Date.now() - status.timestamp < 5 * 60 * 1000) {
+      if (status.status === 'safe') {
+        console.log(`URL ${url} đã được kiểm tra an toàn, cho phép điều hướng`);
+        return;
+      } else if (status.status === 'unsafe') {
+        console.log(`URL ${url} đã được kiểm tra nguy hiểm, chặn điều hướng`);
+        // Chặn điều hướng và hiển thị cảnh báo
+        chrome.tabs.update(tabId, { url: 'chrome://newtab/' });
+        try {
+          await chrome.tabs.sendMessage(tabId, {
+            type: 'URL_SAFETY_WARNING',
+            data: { urlSafety: status.data, isUnsafeUrl: true }
+          });
+        } catch (error) {
+          // Fallback thông báo hệ thống
+          try {
+            await chrome.notifications.create(`unsafe-${Date.now()}`, {
+              type: 'basic',
+              iconUrl: 'icons/icon128.png',
+              title: 'Cảnh báo URL nguy hiểm',
+              message: 'Trang bạn vừa mở có dấu hiệu nguy hiểm. Hãy thận trọng!'
+            });
+          } catch (e) {}
+        }
+        return;
+      }
+    }
+  }
+  
+  // Nếu đang kiểm tra, chặn điều hướng
+  if (processingUrls.has(url)) {
+    console.log(`URL ${url} đang được kiểm tra, chặn điều hướng`);
+    chrome.tabs.update(tabId, { url: 'chrome://newtab/' });
+    return;
+  }
+  
+  // Bắt đầu kiểm tra link - CHẶN ĐIỀU HƯỚNG TRƯỚC
+  console.log(`Bắt đầu kiểm tra link: ${url}`);
+  
+  // Chặn điều hướng và chuyển đến trang kiểm tra đơn giản
+  const checkPageUrl = chrome.runtime.getURL(`link-check.html?url=${encodeURIComponent(url)}`);
+  chrome.tabs.update(tabId, { url: checkPageUrl });
+  
+  // Đánh dấu đang kiểm tra
+  processingUrls.add(url);
+  linkCheckStatus.set(cacheKey, { status: 'checking', timestamp: Date.now() });
+  
+  // GỬI API 1 LẦN DUY NHẤT
+  try {
+    const urlSafetyData = await checkUrlSafety(url);
+    const isUnsafeUrl = urlSafetyData?.success && urlSafetyData.data?.result === 'unsafe';
+    
+    // Cập nhật trạng thái
+    const status = isUnsafeUrl ? 'unsafe' : 'safe';
+    linkCheckStatus.set(cacheKey, { 
+      status, 
+      timestamp: Date.now(),
+      data: urlSafetyData?.data
+    });
+    
+    // Chuyển đến trang kết quả với thông tin đầy đủ
+    const resultPageUrl = chrome.runtime.getURL(`link-result.html?url=${encodeURIComponent(url)}&result=${status}&risk=${urlSafetyData?.data?.riskLevel || 'LOW'}&message=${encodeURIComponent(urlSafetyData?.data?.message || '')}&details=${encodeURIComponent(JSON.stringify(urlSafetyData?.data || {}))}`);
+    chrome.tabs.update(tabId, { url: resultPageUrl });
+    
+  } catch (error) {
+    console.error('Lỗi khi kiểm tra URL:', error);
+    
+    // Trong trường hợp lỗi, đánh dấu là đã kiểm tra
+    linkCheckStatus.set(cacheKey, { status: 'error', timestamp: Date.now() });
+    
+    // Chuyển đến trang kết quả lỗi
+    const resultPageUrl = chrome.runtime.getURL(`link-result.html?url=${encodeURIComponent(url)}&result=error&message=${encodeURIComponent(error.message)}`);
+    chrome.tabs.update(tabId, { url: resultPageUrl });
+  } finally {
+    // Xóa khỏi danh sách đang kiểm tra
+    processingUrls.delete(url);
+  }
+});
+
+// Lắng nghe sự kiện khi tab được cập nhật để tự động kiểm tra URL (giữ nguyên cho tính năng auto check)
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   if (!autoCheckUrl || !tab.url) return;
   if (changeInfo.status !== 'loading' && changeInfo.status !== 'complete') return;
@@ -112,7 +249,12 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
 
 // Xóa cache khi tab đóng để tránh memory leak
 chrome.tabs.onRemoved.addListener((tabId) => {
-  // Có thể thêm logic để xóa cache nếu cần
+  // Xóa các entry liên quan đến tab này
+  for (const [key] of linkCheckStatus) {
+    if (key.startsWith(`${tabId}|`)) {
+      linkCheckStatus.delete(key);
+    }
+  }
 });
 
 // Xóa cache định kỳ để tránh memory leak (mỗi 30 phút)
@@ -120,6 +262,14 @@ setInterval(() => {
   if (checkedUrls.size > 100) { // Chỉ xóa nếu cache quá lớn
     checkedUrls.clear();
     console.log('Đã xóa cache URL đã kiểm tra');
+  }
+  
+  // Xóa cache link check cũ (quá 1 giờ)
+  const oneHourAgo = Date.now() - 60 * 60 * 1000;
+  for (const [key, value] of linkCheckStatus) {
+    if (value.timestamp < oneHourAgo) {
+      linkCheckStatus.delete(key);
+    }
   }
 }, 30 * 60 * 1000);
 
@@ -3104,3 +3254,64 @@ function extractAdvancedFraudEvidence(findings, evidenceText, summary) {
   }
 
 }
+
+// Thêm listener để xử lý message từ link-result.js
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === 'ALLOW_NAVIGATION') {
+    const { url, tabId } = message.data;
+    console.log(`Cho phép điều hướng đến: ${url}`);
+    
+    // Thêm vào allowOnceNavigation để cho phép điều hướng 1 lần
+    const allowKey = `${tabId}|${url}`;
+    allowOnceNavigation.add(allowKey);
+    
+    // Chuyển đến URL đích
+    chrome.tabs.update(tabId, { url: url });
+    
+    // Xóa khỏi allowOnceNavigation sau 5 giây
+    setTimeout(() => {
+      allowOnceNavigation.delete(allowKey);
+    }, 5000);
+    
+    sendResponse({ success: true });
+  }
+  
+  // Thêm message handler để đồng bộ với whitelist
+  if (message.type === 'ADD_TO_WHITELIST') {
+    const { url } = message.data;
+    console.log(`Thêm URL vào whitelist: ${url}`);
+    
+    // Thêm vào whitelist
+    if (!whitelistCache.includes(url)) {
+      whitelistCache.push(url);
+      chrome.storage.sync.set({ whitelistUrls: whitelistCache });
+      console.log(`Đã thêm ${url} vào whitelist`);
+    }
+    
+    // Xóa cache cho URL này
+    for (const [key] of linkCheckStatus) {
+      if (key.includes(url)) {
+        linkCheckStatus.delete(key);
+        console.log(`Đã xóa cache cho URL: ${url}`);
+      }
+    }
+    
+    sendResponse({ success: true });
+  }
+  
+  // Thêm message handler để xóa khỏi whitelist
+  if (message.type === 'REMOVE_FROM_WHITELIST') {
+    const { url } = message.data;
+    console.log(`Xóa URL khỏi whitelist: ${url}`);
+    
+    // Xóa khỏi whitelist
+    const index = whitelistCache.indexOf(url);
+    if (index > -1) {
+      whitelistCache.splice(index, 1);
+      chrome.storage.sync.set({ whitelistUrls: whitelistCache });
+      console.log(`Đã xóa ${url} khỏi whitelist`);
+    }
+    
+    sendResponse({ success: true });
+  }
+});

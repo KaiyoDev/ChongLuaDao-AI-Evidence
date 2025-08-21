@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChongLuaDao - Kết quả Kiểm tra</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #333;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+            text-align: center;
+            transform: translateZ(0);
+        }
+
+        .result-icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+            transform: translateZ(0);
+        }
+
+        .result-title {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+        .result-subtitle {
+            font-size: 16px;
+            color: #6b7280;
+            margin-bottom: 30px;
+        }
+
+        .url-display {
+            background: #f3f4f6;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+            border-left: 4px solid #3b82f6;
+        }
+
+        .url-text {
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            color: #374151;
+            word-break: break-all;
+        }
+
+        .result-box {
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+            text-align: left;
+        }
+
+        .safe-box {
+            background: #f0fdf4;
+            border: 1px solid #10b981;
+        }
+
+        .warning-box {
+            background: #fef3c7;
+            border: 1px solid #f59e0b;
+        }
+
+        .danger-box {
+            background: #fef2f2;
+            border: 1px solid #dc2626;
+        }
+
+        .box-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .safe-box .box-title {
+            color: #15803d;
+        }
+
+        .warning-box .box-title {
+            color: #92400e;
+        }
+
+        .danger-box .box-title {
+            color: #dc2626;
+        }
+
+        .box-text {
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .safe-box .box-text {
+            color: #15803d;
+        }
+
+        .warning-box .box-text {
+            color: #92400e;
+        }
+
+        .danger-box .box-text {
+            color: #7f1d1d;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            display: inline-block;
+            transform: translateZ(0);
+            min-width: 120px;
+        }
+
+        .btn:hover {
+            transform: translateZ(0) translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .btn-primary {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #2563eb;
+        }
+
+        .btn-danger {
+            background: #dc2626;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #b91c1c;
+        }
+
+        .btn-warning {
+            background: #f59e0b;
+            color: white;
+        }
+
+        .btn-warning:hover {
+            background: #d97706;
+        }
+
+        .btn-secondary {
+            background: #6b7280;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #4b5563;
+        }
+
+        .footer {
+            font-size: 12px;
+            color: #9ca3af;
+            margin-top: 20px;
+        }
+
+        .countdown-box {
+            background: #eff6ff;
+            border: 1px solid #3b82f6;
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .countdown-text {
+            font-size: 14px;
+            color: #1d4ed8;
+            font-weight: 500;
+        }
+
+        #countdown {
+            font-weight: 700;
+            color: #dc2626;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .container {
+                padding: 30px 20px;
+            }
+            
+            .result-title {
+                font-size: 20px;
+            }
+            
+            .action-buttons {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .btn {
+                width: 100%;
+                min-width: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="result-icon" id="result-icon">🛡️</div>
+        <h1 class="result-title" id="result-title">Kết quả Kiểm tra</h1>
+        <p class="result-subtitle" id="result-subtitle">ChongLuaDao đã hoàn tất phân tích</p>
+        
+        <div class="url-display">
+            <div class="url-text" id="url-display">Đang tải URL...</div>
+        </div>
+        
+        <div id="result-content">
+            <!-- Nội dung sẽ được điền bởi JavaScript -->
+        </div>
+        
+        <div class="action-buttons" id="action-buttons">
+            <!-- Buttons sẽ được điền bởi JavaScript -->
+        </div>
+        
+        <div class="footer">
+            <p>🛡️ ChongLuaDao AI Evidence Extension v2.15.7</p>
+        </div>
+    </div>
+
+    <script src="link-result.js"></script>
+</body>
+</html>
