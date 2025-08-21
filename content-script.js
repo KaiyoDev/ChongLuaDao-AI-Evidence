@@ -229,12 +229,12 @@ function showUrlSafetyWarning(data) {
   // Event listeners
   document.getElementById('chongluadao-cancel-scan').onclick = () => {
     modal.remove();
-    showStatusUpdate("❌ Đã hủy quét theo yêu cầu người dùng");
+    //showStatusUpdate("❌ Đã hủy quét theo yêu cầu người dùng");
   };
   
   document.getElementById('chongluadao-force-scan').onclick = () => {
     modal.remove();
-    showStatusUpdate("🔍 Đang tiếp tục quét (bỏ qua cảnh báo)...");
+    //showStatusUpdate("🔍 Đang tiếp tục quét (bỏ qua cảnh báo)...");
     
     // Gửi message để tiếp tục quét với forceScan = true
     chrome.runtime.sendMessage({
@@ -248,7 +248,7 @@ function showUrlSafetyWarning(data) {
   modal.onclick = (e) => {
     if (e.target === modal) {
       modal.remove();
-      showStatusUpdate("❌ Đã hủy quét theo yêu cầu người dùng");
+      //showStatusUpdate("❌ Đã hủy quét theo yêu cầu người dùng");
     }
   };
 }

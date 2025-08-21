@@ -50,6 +50,13 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
     // Bỏ qua các URL đã kiểm tra trong phiên này (tránh spam)
     if (checkedUrls.has(tab.url)) return;
     
+    // Kiểm tra whitelist
+    const { whitelistUrls = [] } = await chrome.storage.sync.get(['whitelistUrls']);
+    if (isUrlInWhitelist(tab.url, whitelistUrls)) {
+      console.log('URL trong whitelist, bỏ qua kiểm tra:', tab.url);
+      return;
+    }
+    
     console.log('Tự động kiểm tra URL:', tab.url);
     
     // Thêm vào cache để tránh kiểm tra lại
@@ -174,6 +181,51 @@ async function checkUrlSafety(url) {
       success: false,
       data: { result: "unknown", riskLevel: "unknown", message: "Lỗi khi kiểm tra an toàn URL" }
     };
+  }
+}
+
+// Kiểm tra URL có trong whitelist không
+function isUrlInWhitelist(url, whitelistUrls) {
+  if (!whitelistUrls || whitelistUrls.length === 0) return false;
+  
+  try {
+    const urlObj = new URL(url);
+    const hostname = urlObj.hostname.toLowerCase();
+    
+    for (const whitelistUrl of whitelistUrls) {
+      const whitelist = whitelistUrl.trim().toLowerCase();
+      
+      // Kiểm tra URL chính xác
+      if (whitelist === url.toLowerCase()) {
+        return true;
+      }
+      
+      // Kiểm tra domain chính xác
+      if (whitelist === hostname) {
+        return true;
+      }
+      
+      // Kiểm tra wildcard subdomain (ví dụ: *.google.com)
+      if (whitelist.startsWith('*.')) {
+        const wildcardDomain = whitelist.substring(2); // Bỏ "*. "
+        if (hostname === wildcardDomain || hostname.endsWith('.' + wildcardDomain)) {
+          return true;
+        }
+      }
+      
+      // Kiểm tra wildcard domain (ví dụ: *.com)
+      if (whitelist.startsWith('*.')) {
+        const wildcardDomain = whitelist.substring(2);
+        if (hostname.endsWith('.' + wildcardDomain)) {
+          return true;
+        }
+      }
+    }
+    
+    return false;
+  } catch (error) {
+    console.error('Error checking whitelist:', error);
+    return false;
   }
 }
 

@@ -59,7 +59,8 @@ async function loadConfig() {
       'geminiEndpointBase',
       'userEmail',
       'apiHeaders',
-      'autoCheckUrl'
+      'autoCheckUrl',
+      'whitelistUrls'
     ]);
 
     // Convert array to textarea format
@@ -70,6 +71,7 @@ async function loadConfig() {
     $('#userEmail').value = config.userEmail || '';
     $('#apiHeaders').value = config.apiHeaders || '';
     $('#autoCheckUrl').checked = config.autoCheckUrl || false;
+    $('#whitelistUrls').value = (config.whitelistUrls || []).join('\n');
     
     showToast("⚙️ Đã tải cấu hình", "success");
   } catch (error) {
@@ -87,13 +89,19 @@ async function saveConfig() {
       .map(key => key.trim())
       .filter(key => key.length > 0);
 
+    const whitelistText = $('#whitelistUrls').value.trim();
+    const whitelistUrls = whitelistText.split('\n')
+      .map(u => u.trim())
+      .filter(u => u.length > 0);
+
     const config = {
       geminiApiKeys: apiKeys,
       geminiModel: $('#geminiModel').value,
       geminiEndpointBase: $('#geminiEndpointBase').value.trim(),
       userEmail: $('#userEmail').value.trim(),
       apiHeaders: $('#apiHeaders').value.trim(),
-      autoCheckUrl: $('#autoCheckUrl').checked
+      autoCheckUrl: $('#autoCheckUrl').checked,
+      whitelistUrls
     };
 
     // Validate required fields
@@ -108,8 +116,6 @@ async function saveConfig() {
     if (invalidKeys.length > 0) {
       showToast(`⚠️ ${invalidKeys.length} API Key không đúng định dạng (phải bắt đầu bằng 'AIza')`, "warning");
     }
-
-
 
     // Validate JSON headers if provided
     if (config.apiHeaders) {

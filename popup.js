@@ -463,12 +463,34 @@ function forceCloseAllModals() {
   hideProgress();
 }
 
+// ===== Quick Settings Functions =====
+async function loadQuickSettings() {
+  try {
+    const config = await chrome.storage.sync.get(['autoCheckUrl']);
+    
+    // Load auto check URL toggle
+    const autoCheckToggle = $('#autoCheckUrlToggle');
+    autoCheckToggle.checked = config.autoCheckUrl || false;
+  } catch (error) {
+    console.error('Error loading quick settings:', error);
+  }
+}
+
+async function saveAutoCheckUrl(enabled) {
+  try {
+    await chrome.storage.sync.set({ autoCheckUrl: enabled });
+  } catch (error) {
+    console.error('Error saving auto check URL setting:', error);
+  }
+}
+
 // ===== Event Listeners =====
 document.addEventListener('DOMContentLoaded', () => {
   // Initialize
   updateConnectionStatus();
   initTabs();
   updateHistoryStats();
+  loadQuickSettings();
   
   // Force close any open modals on load
   forceCloseAllModals();
@@ -479,6 +501,11 @@ document.addEventListener('DOMContentLoaded', () => {
   // Main action buttons
   $('#run').addEventListener('click', () => runAnalysis(true));
   $('#runQuick').addEventListener('click', () => runAnalysis(false));
+  
+  // Header tiny toggle
+  $('#autoCheckUrlToggle').addEventListener('change', (e) => {
+    saveAutoCheckUrl(e.target.checked);
+  });
   
   // Tool buttons
   $('#history').addEventListener('click', () => {
@@ -491,9 +518,9 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#copyReport').addEventListener('click', async () => {
     try {
       if (currentReportText) {
-    await navigator.clipboard.writeText(currentReportText);
+        await navigator.clipboard.writeText(currentReportText);
       }
-  } catch (error) {
+    } catch (error) {
       console.error('Error copying report:', error);
     }
   });
@@ -501,12 +528,12 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#fillForm').addEventListener('click', async () => {
     try {
       if (currentReportData) {
-    await chrome.runtime.sendMessage({ 
-      type: "FILL_CHONGLUADAO_FORM", 
-      reportData: currentReportData 
-    });
+        await chrome.runtime.sendMessage({ 
+          type: "FILL_CHONGLUADAO_FORM", 
+          reportData: currentReportData 
+        });
       }
-  } catch (error) {
+    } catch (error) {
       console.error('Error filling form:', error);
     }
   });
@@ -531,7 +558,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (currentReportData) {
         await chrome.tabs.create({ url: chrome.runtime.getURL("result.html") });
       }
-  } catch (error) {
+    } catch (error) {
       console.error('Error opening result tab:', error);
     }
   });
@@ -543,8 +570,6 @@ document.addEventListener('DOMContentLoaded', () => {
       hideProgress();
     }
   });
-  
-
   
   // Check connection status on load
   updateConnectionStatus();
